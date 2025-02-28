@@ -28,7 +28,7 @@ local inP4, inCombat, rasialDead = false, false, false
 local badTiles = {}
 local safeBoundary = {}
 
-local abilityRotation = { -- Ability rotation order for p1-p3, change as needed!
+local abilityRotation = { -- Ability rotation order, change as needed!
 "Vulnerability", "Death Skulls", "Bloat", "Soul Sap", "Touch of Death", "Basic<nbsp>Attack", "Soul Sap", "Command Skeleton Warrior", "Resonance", -- 
 "Soul Sap", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Living Death", "Touch of Death", "Soul Sap", "Basic<nbsp>Attack", "Death Skulls", "Split Soul", --
 "Command Skeleton Warrior", "Basic<nbsp>Attack", "Finger of Death", "Volley of Souls", "Weapon Special Attack", "Touch of Death", "Soul Sap", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Death Skulls", --
@@ -109,7 +109,7 @@ end
 local function executeAbility(abilityName)
     if abilityName == "Living Death" then
         API.DoAction_Ability(abilityName, 1, API.OFF_ACT_GeneralInterface_route, true)  
-        if hasExcalibur then API.DoAction_Ability("Augmented enhanced Excalibur", 1, API.OFF_ACT_GeneralInterface_route) end
+        if hasExcalibur then API.DoAction_Ability(excaliburName, 1, API.OFF_ACT_GeneralInterface_route) end
         if hasAdrenPot then API.DoAction_Ability(adrenPot, 1, API.OFF_ACT_GeneralInterface_route) end
     else
         API.DoAction_Ability(abilityName, 1, API.OFF_ACT_GeneralInterface_route, true)
