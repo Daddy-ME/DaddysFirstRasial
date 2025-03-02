@@ -414,7 +414,7 @@ local function establishSafeBoundary()
 
         local rasialTile = findRasial.Tile_XYZ
         if rasialTile then
-            local wallY = rasialTile.y - 2  -- Wall is 2 tiles south of Rasial
+            local wallY = rasialTile.y - 3  -- Wall is 2 tiles south of Rasial
 
             safeBoundary = {
                 minX = rasialTile.x - 6, maxX = rasialTile.x + 6,
@@ -461,12 +461,12 @@ end
 local function preRasial() -- walking to the back of the instance
     if findNpcOrObject(126134, 30, 12) and not hasTarget() then
       --print("Encounter Started, moving to back")
-        API.RandomSleep2(600, 300, 600)
+        API.RandomSleep2(600, 600, 0)
         UTILS.surge()
         API.DoAction_Ability("Command Vengeful Ghost", 1, API.OFF_ACT_GeneralInterface_route)
-        API.RandomSleep2(1200, 300, 0)
-        moveToOffsetTile(-4, 12)
-        API.RandomSleep2(600, 100, 100)
+        API.RandomSleep2(600, 600, 0)
+        moveToOffsetTile(0, 12)
+        API.RandomSleep2(1200, 600, 0)
         API.DoAction_Ability("Command Skeleton Warrior", 1, API.OFF_ACT_GeneralInterface_route)
     else
        --print(findNpcOrObject(126134, 50, 12))
