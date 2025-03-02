@@ -133,7 +133,6 @@ local function timeTrack()
     end
     if currentTime - lastGenericTime >= globalCD then
         genericCooldown = false
-        changeEquip = false
     end
 end
 
@@ -230,79 +229,81 @@ end
 
 local function updateBadTiles()
     local currentTick = API.Get_tick()  -- Get the current tick
-
+    badTiles = {}
     -- Step 1: Detect current bad tiles
     local detectedTiles = API.GetAllObjArray1({7862, 6974}, 20, {4})
     local currentDetectedKeys = {}  -- Store keys of currently detected tiles
 
     for _, item in ipairs(detectedTiles) do
         if item.Tile_XYZ then
-            local x, y = item.Tile_XYZ.x, item.Tile_XYZ.y
-            local key = x .. "," .. y  -- Unique key for tile storage
-            currentDetectedKeys[key] = true  -- Mark this tile as currently detected
-
-            -- If this tile is new, store it with the current tick
-            if not badTiles[key] then
-                badTiles[key] = {x = x, y = y, tick = currentTick}
-                --print("Registered new bad tile:", key)
-            end
-        end
-    end
-
-    -- Step 2: Remove expired bad tiles (not currently detected)
-    for key, _ in pairs(badTiles) do
-        if not currentDetectedKeys[key] then
-            badTiles[key] = nil  -- Remove tile if it's no longer detected
-            --print("Removed bad tile:", key)
+            badTiles[#badTiles+1] = item.Tile_XYZ
+            --print("Bad tile detected:", item.Tile_XYZ.x, item.Tile_XYZ.y)
         end
     end
 end
 
 local function isPlayerOnBadTile()
     local playerTile = API.PlayerCoordfloat()
-    local key = playerTile.x .. "," .. playerTile.y
 
-    if badTiles[key] then
-        --print("Player is standing on a bad tile!")
-        return true
+    for _, badTile in ipairs(badTiles) do
+        if badTile.x == playerTile.x and badTile.y == playerTile.y then
+            --print("Player is standing on a bad tile!")
+            return true
+        end
     end
 
     --print("Player is safe.")
     return false
 end
 
+local function isTileBad(tile)
+    for _, badTile in ipairs(badTiles) do
+        if badTile.x == tile.x and badTile.y == tile.y then
+            return true  -- Tile is bad
+        end
+    end
+    return false  -- Tile is safe
+end
 
-local function isPathSafe(startTile, endTile)
+local function isPathSafe(startTile, endTile, badTiles)
     local currentTick = API.Get_tick()
     local dx = endTile.x - startTile.x
     local dy = endTile.y - startTile.y
     local steps = math.max(math.abs(dx), math.abs(dy))  -- Total steps needed
 
-    -- Normalize step direction (-1, 0, 1)
+    --print("Checking path from x=" .. startTile.x .. ", y=" .. startTile.y .. " to x=" .. endTile.x .. ", y=" .. endTile.y)
+
+    -- Normalize step direction (-1, 0, 1) for both X and Y
     local stepX = dx ~= 0 and (dx / math.abs(dx)) or 0  
     local stepY = dy ~= 0 and (dy / math.abs(dy)) or 0  
 
-    -- First step: Move 1 tile (diagonal if possible)
-    local checkTile = {x = startTile.x + stepX, y = startTile.y + stepY}  
+    --print("Step direction: x=" .. stepX .. ", y=" .. stepY)
 
-    local key = math.floor(checkTile.x) .. "," .. math.floor(checkTile.y)
-    if badTiles[key] and (currentTick - badTiles[key].tick >= 2) then
-        --print("Path blocked at first step x=" .. checkTile.x .. ", y=" .. checkTile.y)
-        return false
-    end
+    -- Current tile starting point
+    local checkTile = {x = startTile.x, y = startTile.y}
 
-    -- Subsequent steps: Move 2 tiles per tick (diagonal if possible)
-    for i = 2, steps, 2 do  
-        checkTile.x = checkTile.x + stepX * 2  
-        checkTile.y = checkTile.y + stepY * 2  
+    -- Loop through each step and check if the path is clear
+    for i = 1, steps do
+        -- Move diagonally or in the current direction
+        if stepX ~= 0 and stepY ~= 0 then
+            checkTile.x = checkTile.x + stepX
+            checkTile.y = checkTile.y + stepY
+        elseif stepX ~= 0 then
+            checkTile.x = checkTile.x + stepX
+        elseif stepY ~= 0 then
+            checkTile.y = checkTile.y + stepY
+        end
 
-        local key = math.floor(checkTile.x) .. "," .. math.floor(checkTile.y)
-        if badTiles[key] and (currentTick - badTiles[key].tick >= 2) then
+        --print("Checking tile x=" .. checkTile.x .. ", y=" .. checkTile.y)
+
+        -- Check if the tile is bad
+        if isTileBad(checkTile, badTiles) then
             --print("Path blocked at x=" .. checkTile.x .. ", y=" .. checkTile.y)
-            return false
+            return false  -- Path is blocked by a bad tile
         end
     end
 
+    --print("Path is safe")
     return true  -- Path is safe
 end
 
@@ -350,10 +351,12 @@ local function loot()
 end
 
 local function findSafeTile()
-    local safeTiles = API.Math_FreeTiles(badTiles, 0, 25)
-    local playerPos = API.PlayerCoord()
-    local minDistance = 4
+    local safeTiles = API.Math_FreeTiles(badTiles, 0, 12, {})
+    local playerPos = API.PlayerCoordfloat()
+    local minDistance = 1
     local filteredSafeTiles = {}
+    local blockAttempts = 0
+    --print("safeTiles: " .. #safeTiles)
 
     for _, tile in ipairs(safeTiles) do
         local dx, dy = math.abs(tile.x - playerPos.x), math.abs(tile.y - playerPos.y)
@@ -363,7 +366,13 @@ local function findSafeTile()
     end
 
     for _, tile in ipairs(filteredSafeTiles) do
-        if isPathSafe(playerPos, tile) then
+        if blockAttempts < 5 then
+            if not isPathSafe(playerPos, tile) then
+                blockAttempts = blockAttempts + 1
+            elseif isPathSafe(playerPos, tile) then
+                return tile
+            end
+        else
             return tile
         end
     end
@@ -427,7 +436,7 @@ function rasialFight()
 
     while API.GetInCombBit() or rasial.Life > 0 do
         rasial = getRasial()
-        if rasial.Life <= 200000 then
+        if rasial.Life <= 200000 and not inP4 then
           --print("Target's life is at or below 20%. going to p4.")
             inP4 = true
         end
