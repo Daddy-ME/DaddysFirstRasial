@@ -414,7 +414,7 @@ local function establishSafeBoundary()
 
         local rasialTile = findRasial.Tile_XYZ
         if rasialTile then
-            local wallY = rasialTile.y - 3  -- Wall is 2 tiles south of Rasial
+            local wallY = rasialTile.y - 3  -- Wall is 3 tiles south of Rasial
 
             safeBoundary = {
                 minX = rasialTile.x - 6, maxX = rasialTile.x + 6,
@@ -516,7 +516,7 @@ local function warsBank()
     API.RandomSleep2(500, 300, 500)
     --print("Clicking on the load preset (chest)")
     API.DoAction_Object1(0x33, API.OFF_ACT_GeneralObject_route3, {114750}, 50) -- QUICKLOAD
-    API.RandomSleep2(500, 300, 400)
+    API.RandomSleep2(1200, 300, 400)
     API.WaitUntilMovingEnds(1, 10)
     if hasBankPin then API.DoBankPin(PIN) end
     while hp < 100 -- sleeping to heal off damage
