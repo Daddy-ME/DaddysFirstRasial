@@ -1,4 +1,4 @@
---print("Daddy's first Rasial 1.0")
+--print("Daddy's first Rasial 1.1")
 --print("by Daddy")
 local API = require("api")
 local UTILS = require("utils")
