@@ -651,7 +651,7 @@ local function warsBank()
     API.RandomSleep2(500, 300, 500)
     
     API.DoAction_Object1(0x33, API.OFF_ACT_GeneralObject_route3, {114750}, 50) -- QUICKLOAD
-    API.RandomSleep2(2400, 600, 1200)
+    API.RandomSleep2(3000, 600, 1200)
     API.WaitUntilMovingEnds(1, 10)
     if hasBankPin then API.DoBankPin(PIN) end
     
