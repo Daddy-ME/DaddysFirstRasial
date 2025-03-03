@@ -741,7 +741,7 @@ local started = false
 
 while API.Read_LoopyLoop() do
     API.SetMaxIdleTime(5)
-    is not started then scriptStart() end
+    if not started then scriptStart() end
     if API.Read_LoopyLoop() then
         deathCheck()
         DungeonEntrance()
