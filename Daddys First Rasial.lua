@@ -33,7 +33,7 @@ local deflectCues = {
     "true",
 }
 local relevantIds = {
-    overload = { id = 26093, potionID = {}, count = nil }, -- holy overloads
+    overload = { potionID = {}, count = nil }, 
     summon = { id = 26095, pouchID = {} }, -- hellhound
     deflectNecro = { id = 30745 },
     soulSplit = { id = 26033 },
