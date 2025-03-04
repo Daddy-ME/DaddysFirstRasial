@@ -5,8 +5,8 @@ local UTILS = require("utils")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
 local percentHpToEat = 50
-local hasBankPin = false
-local PIN = 0000
+--local hasBankPin = false
+--local PIN = 0000
 -----------------------------------------------
 local globalCD = 3
 
@@ -653,7 +653,7 @@ local function warsBank()
     API.DoAction_Object1(0x33, API.OFF_ACT_GeneralObject_route3, {114750}, 50) -- QUICKLOAD
     API.RandomSleep2(3000, 600, 1200)
     API.WaitUntilMovingEnds(1, 10)
-    if hasBankPin then API.DoBankPin(PIN) end
+    --if hasBankPin then API.DoBankPin(PIN) end
     
     if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur"}) then
         shouldContinue = false
