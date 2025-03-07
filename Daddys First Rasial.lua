@@ -848,29 +848,30 @@ local function warsBank()
             API.RandomSleep2(600, 0, 0)
         end
     end
-    if not AURAS.isAuraEquipped() then
-        if not captureAuraActivation() then
-            print("aura on cooldown, resetting")
-            RandomSleep2(1200,0,0)
-            AURAS.openAuraInterface()
-            RandomSleep2(1200,0,0)
-            API.DoAction_Interface(0xffffffff,0x5716,1,1929,95,23,API.OFF_ACT_GeneralInterface_route)
-            RandomSleep2(1200,0,0)
-            API.DoAction_Interface(0xffffffff,0x7c68,1,1929,24,-1,API.OFF_ACT_GeneralInterface_route)
-            RandomSleep2(1800,0,0)
-            refreshStatus = API.ScanForInterfaceTest2Get(false, refreshInterface)
-            auraRefreshes = API.ScanForInterfaceTest2Get(false, auraRefreshInterface2)
-            if #refreshStatus > 0 and auraRefreshes[1].itemid1_size > 0 then
-                API.DoAction_Interface(0xffffffff,0xffffffff,0,1188,8,-1,API.OFF_ACT_GeneralInterface_Choose_option)
+    if useEquilibriumAura then
+        if not AURAS.isAuraEquipped() then
+            if not captureAuraActivation() then
+                print("aura on cooldown, resetting")
+                RandomSleep2(1200,0,0)
+                AURAS.openAuraInterface()
+                RandomSleep2(1200,0,0)
+                API.DoAction_Interface(0xffffffff,0x5716,1,1929,95,23,API.OFF_ACT_GeneralInterface_route)
+                RandomSleep2(1200,0,0)
+                API.DoAction_Interface(0xffffffff,0x7c68,1,1929,24,-1,API.OFF_ACT_GeneralInterface_route)
+                RandomSleep2(1800,0,0)
+                refreshStatus = API.ScanForInterfaceTest2Get(false, refreshInterface)
+                auraRefreshes = API.ScanForInterfaceTest2Get(false, auraRefreshInterface2)
+                if #refreshStatus > 0 and auraRefreshes[1].itemid1_size > 0 then
+                    API.DoAction_Interface(0xffffffff,0xffffffff,0,1188,8,-1,API.OFF_ACT_GeneralInterface_Choose_option)
+                end
+                RandomSleep2(1800,0,0)
+                AURAS.EQUILIBRIUM:activate()
+                RandomSleep2(1800,0,0)
+                AURAS.closeAuraInterface()
             end
-            RandomSleep2(1800,0,0)
-            AURAS.EQUILIBRIUM:activate()
-            RandomSleep2(1800,0,0)
-            AURAS.closeAuraInterface()
         end
     end
 end
-
 local function WhereTfAreWe()
     local findSconce = findNpcOrObject(126134, 50, 12)
     local findWarAltar = findNpcOrObject(114748, 50, 0)
