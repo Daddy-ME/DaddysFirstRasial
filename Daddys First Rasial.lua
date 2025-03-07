@@ -34,8 +34,8 @@ local abilityRotation = { -- Ability rotation order, change as needed!
 }
 
 local deflectCues = {
-    "Suffer",
-    "true",
+    "Suffer at my hand",
+    "This is true power",
 }
 local relevantIds = {
     overload = {buffId = {26093, 33210, 49039}, potionID = {}, count = 0, globalCount = 0, globalCountSet = false }, 
@@ -48,7 +48,8 @@ local relevantIds = {
     adrenaline = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false }, -- Shared table for both Adrenaline and Renewals
     excalibur = { hasExcalibur = false, id = 0 },
     scroll = { scrollID = {}, amount = 0 },
-    vulnbombs = { id = {}, amount = 0 }
+    vulnbombs = { id = {}, amount = 0 },
+    restore = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false}
 }
 
 -- Helper function to check if an ID already exists in the list
@@ -174,6 +175,8 @@ local function checkInventoryItems(itemCategories)
             checkItem({"scroll"}, relevantIds.scroll)
         elseif itemCategory == "vulnBombs" then
             checkItem({"vulnerability bomb"}, relevantIds.vulnbombs)
+        elseif itemCategory == "restore" then
+            checkItem({"super restore", "prayer potion", "prayer flask"}, relevantIds.restore)
         else
             print("Invalid category specified: " .. itemCategory)
         end
@@ -318,7 +321,7 @@ local function timeTrack()
     end
     if currentTime - lastEatTime >= globalCD and foodCooldown then
         foodCooldown = false
-        checkItem({"blubber"}, relevantIds.blubber, "blubber")
+        checkItem({"blubber"}, relevantIds.blubber)
     end
     if currentTime - lastMoveTime >= 2 and moveCooldown then
         moveCooldown = false 
@@ -328,8 +331,9 @@ local function timeTrack()
     end
     if currentTime - lastDrinkTime >= globalCD and drinkCooldown then
         drinkCooldown = false
-        checkItem({"brew"}, relevantIds.brew, "brew")
-        checkItem({"overload"}, relevantIds.overload, "overload")
+        checkItem({"brew"}, relevantIds.brew)
+        checkItem({"overload"}, relevantIds.overload)
+        checkItem({"restore"}, relevantIds.restore)
     end
     if currentTime - lastScrollTime >= 2 and scrollCooldown then
         scrollCooldown = false
@@ -338,7 +342,7 @@ local function timeTrack()
     end
     if currentTime - lastVulnTime >= 100 and vulnCooldown then
         vulnCooldown = false
-        checkItem({"vulnBombs"}, relevantIds.vulnbombs, "Vulnerability bomb")
+        checkItem({"vulnBombs"}, relevantIds.vulnbombs)
     end
 end
 
@@ -427,6 +431,15 @@ end
 
 local function healthCheck()
     local hp = API.GetHPrecent()
+    local pray = API.GetPray_()
+    if pray < 100 then
+        if relevantIds.restore and #relevantIds.restore.potionID > 0 and not drinkCooldown then
+            if Inventory:IsOpen() then API.DoAction_Inventory2(relevantIds.restore.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route)
+                lastDrinkTime = API.Get_tick()
+                drinkCooldown = true
+            end
+        end
+    end
     if hp < percentHpToEat then
         eatNdrink()
     elseif hp < 5 then
@@ -733,7 +746,7 @@ local function needBank()
     local hp = API.GetHPrecent()
     local pray = API.GetPray_()
     local adren = API.GetAdrenalineFromInterface()
-    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs"}) or hp < 100 or pray < 900 or adren < 100 then
+    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs", "restore"}) or hp < 100 or pray < 900 or adren < 100 then
         return true
     end
 end
@@ -747,7 +760,7 @@ local function warsBank()
     API.WaitUntilMovingEnds(1, 10)
     --if hasBankPin then API.DoBankPin(PIN) end
     
-    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs"}) then
+    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs", "restore"}) then
         shouldContinue = false
         API.Write_LoopyLoop(false)
         return
@@ -824,7 +837,7 @@ local function scriptStart()
     API.DoAction_Object1(0x33, API.OFF_ACT_GeneralObject_route3, {114750}, 50) -- QUICKLOAD
     API.RandomSleep2(1200, 300, 400)
     API.WaitUntilMovingEnds(1, 10)
-    checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "scroll", "bindingContract", "vulnBombs"})
+    checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "scroll", "bindingContract", "vulnBombs", "restore"})
     if API.VB_FindPSettinOrder(3102).state == 1 then
         checkAndStoreScrolls()
     else
