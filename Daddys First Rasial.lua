@@ -1,10 +1,12 @@
---print("Daddy's first Rasial 1.21")
+--print("Daddy's first Rasial 1.22")
 --print("by Daddy")
 local API = require("api")
 local UTILS = require("utils")
+local AURAS = require("deadAuras")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
 local percentHpToEat = 50
+local useEquilibriumAura = false
 --local hasBankPin = false
 --local PIN = 0000
 -----------------------------------------------
@@ -49,7 +51,8 @@ local relevantIds = {
     excalibur = { hasExcalibur = false, id = 0 },
     scroll = { scrollID = {}, amount = 0 },
     vulnbombs = { id = {}, amount = 0 },
-    restore = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false}
+    restore = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false},
+    aura = { buffID = 26098 },
 }
 
 -- Helper function to check if an ID already exists in the list
@@ -60,6 +63,48 @@ local function containsId(id, idList)
         end
     end
     return false
+end
+local refreshInterface = {
+    InterfaceComp5.new(1477, 25, -1, 0),
+    InterfaceComp5.new(1477, 765, -1, 0),
+    InterfaceComp5.new(1477, 767, -1, 0),
+}
+local auraRefreshInterface2 = {
+    InterfaceComp5.new(1929, 0, -1, 0),
+    InterfaceComp5.new(1929, 3, -1, 0),
+    InterfaceComp5.new(1929, 4, -1, 0),
+    InterfaceComp5.new(1929, 20, -1, 0),
+    InterfaceComp5.new(1929, 21, -1, 0),
+    InterfaceComp5.new(1929, 24, -1, 0),
+}
+function captureAuraActivation()
+    local old_print = print
+    local message = nil
+
+    -- Override print function
+    print = function(...)
+        local args = {...}
+        local str = ""
+
+        -- Convert all arguments to string
+        for i, v in ipairs(args) do
+            str = str .. tostring(v)  -- Convert each argument to string
+        end
+
+        -- Check if the message is "dont have aura"
+        if str == "dont have aura" then
+            message = str
+        end
+        
+        old_print(...)  -- Call the original print function
+    end
+
+    AURAS.EQUILIBRIUM:activate()
+
+    -- Restore original print function
+    print = old_print
+
+    return message ~= "dont have aura"  -- Returns true if activation was successful
 end
 
 -- General function to check for items
@@ -350,6 +395,14 @@ local function timeTrack()
     end
 end
 
+local function openEquipmentInterface()
+    API.DoAction_Interface(0xc2, 0xffffffff, 1, 1432, 5, 2, API.OFF_ACT_GeneralInterface_route)
+end
+
+local function isEquipmentInterfaceOpen()
+    return API.VB_FindPSettinOrder(3074,1).state == 1
+end
+
 local function findNPC(npcid, distance)
     local distance = distance or 20
     local npcs = API.GetAllObjArrayInteract(type(npcid) == "table" and npcid or {npcid}, distance, {1})
@@ -367,7 +420,7 @@ end
 
 local function waitForRasial(maxWaitTime)
     local timeWaited = 0
-    local intervalCheck = 200
+    local intervalCheck = 300
 
     while timeWaited < maxWaitTime do
 
@@ -433,6 +486,15 @@ local function eatNdrink()
     end
 end
 
+local function hasScrollId(targetId)
+    for _, id in ipairs(relevantIds.scroll.scrollID) do
+        if id == targetId then
+            return true
+        end
+    end
+    return false
+end
+
 local function healthCheck()
     local hp = API.GetHPrecent()
     local pray = API.GetPray_()
@@ -451,7 +513,7 @@ local function healthCheck()
         WarsRoomTeleport()
         --print("Something funky happened, resetting")
     end
-    if usingScrolls then
+    if usingScrolls and hasScrollId(49413) then
         local summonHP = Familiars:GetHealth()
         if tonumber(summonHP) < 6000 and not scrollCooldown then
             --print(summonHP)
@@ -706,10 +768,10 @@ end
 local function preRasial() -- walking to the back of the instance
     if findNpcOrObject(126134, 30, 12) and not hasTarget() then
       --print("Encounter Started, moving to back")
-        API.RandomSleep2(600, 100, 0)
+        API.RandomSleep2(300, 300, 0)
         UTILS.surge()
         API.DoAction_Ability("Command Vengeful Ghost", 1, API.OFF_ACT_GeneralInterface_route)
-        API.RandomSleep2(1200, 100, 0)
+        API.RandomSleep2(600, 600, 0)
         moveToOffsetTile(0, 12)
         API.RandomSleep2(1200, 600, 0)
         API.DoAction_Ability("Command Skeleton Warrior", 1, API.OFF_ACT_GeneralInterface_route)
@@ -721,6 +783,9 @@ end
 local function DungeonEntrance()
     if findNpcOrObject(127142, 5, 12) then
         buffCheck()
+        if useEquilibriumAura then
+            AURAS.EQUILIBRIUM:activate()
+        end
         --print("Entrance Found, Conjuring and Extending")
         executeAbility("Conjure Undead Army")
         API.RandomSleep2(1800, 600, 0)
@@ -781,6 +846,27 @@ local function warsBank()
         API.DoAction_Object1(0x29, API.OFF_ACT_GeneralObject_route0, {114749}, 50)
         while API.GetAdrenalineFromInterface() < 100 do
             API.RandomSleep2(600, 0, 0)
+        end
+    end
+    if not AURAS.isAuraEquipped() then
+        if not captureAuraActivation() then
+            print("aura on cooldown, resetting")
+            RandomSleep2(1200,0,0)
+            AURAS.openAuraInterface()
+            RandomSleep2(1200,0,0)
+            API.DoAction_Interface(0xffffffff,0x5716,1,1929,95,23,API.OFF_ACT_GeneralInterface_route)
+            RandomSleep2(1200,0,0)
+            API.DoAction_Interface(0xffffffff,0x7c68,1,1929,24,-1,API.OFF_ACT_GeneralInterface_route)
+            RandomSleep2(1800,0,0)
+            refreshStatus = API.ScanForInterfaceTest2Get(false, refreshInterface)
+            auraRefreshes = API.ScanForInterfaceTest2Get(false, auraRefreshInterface2)
+            if #refreshStatus > 0 and auraRefreshes[1].itemid1_size > 0 then
+                API.DoAction_Interface(0xffffffff,0xffffffff,0,1188,8,-1,API.OFF_ACT_GeneralInterface_Choose_option)
+            end
+            RandomSleep2(1800,0,0)
+            AURAS.EQUILIBRIUM:activate()
+            RandomSleep2(1800,0,0)
+            AURAS.closeAuraInterface()
         end
     end
 end
