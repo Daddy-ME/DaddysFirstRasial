@@ -1,4 +1,4 @@
---print("Daddy's first Rasial 1.2")
+--print("Daddy's first Rasial 1.21")
 --print("by Daddy")
 local API = require("api")
 local UTILS = require("utils")
@@ -10,47 +10,46 @@ local percentHpToEat = 50
 -----------------------------------------------
 local globalCD = 3
 
-local globalCooldownActive, foodCooldown, moveCooldown, genericCooldown = false, false, false, false
-local lastAbilityTime, lastEatTime, lastMoveTime, lastDrinkTime, lastSummonTime, lastGenericTime = 0, 0, 0, 0, 0, 0
-local deflectTimer = 0
-local inP4, inCombat, rasialDead = false, false, false
+local globalCooldownActive, foodCooldown, drinkCooldown, moveCooldown, genericCooldown, vulnCooldown = false, false, false, false, false, false
+local lastAbilityTime, lastEatTime, lastMoveTime, lastDrinkTime, lastSummonTime, lastGenericTime, lastVulnTime, lastScrollTime = 0, 0, 0, 0, 0, 0, 0, 0
+local deflectTimer, storedScrolls = 0, 0
+local inP4, inCombat, rasialDead, usingScrolls, usingVulnBombs = false, false, false, false, false
 
 local badTiles = {}
 local safeBoundary = {}
 
 local abilityRotation = { -- Ability rotation order, change as needed!
-"Vulnerability", "Death Skulls", "Bloat", "Soul Sap", "Touch of Death", "Basic<nbsp>Attack", "Soul Sap", "Command Skeleton Warrior", "Resonance", -- 
-"Soul Sap", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Living Death", "Touch of Death", "Soul Sap", "Basic<nbsp>Attack", "Death Skulls", "Split Soul", --
-"Command Skeleton Warrior", "Basic<nbsp>Attack", "Finger of Death", "Volley of Souls", "Weapon Special Attack", "Touch of Death", "Soul Sap", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Death Skulls", --
-"Soul Sap", "Command Skeleton Warrior", "Basic<nbsp>Attack", "Soul Sap", "Touch of Death", "Basic<nbsp>Attack", "Soul Sap", "Bloat", "Vulnerability", "Soul Sap", "Volley of Souls", --
-"Command Skeleton Warrior", "Soul Sap", "Weapon Special Attack", "Life Transfer", "Touch of Death", "Soul Sap", "Basic<nbsp>Attack", "Freedom", "Bloat", "Soul Sap", "Basic<nbsp>Attack", --
-"Command Skeleton Warrior", "Death Skulls", "Soul Sap", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Soul Sap", "Bloat", "Volley of Souls", "Basic<nbsp>Attack", "Finger of Death", "Weapon Special Attack", --
-"Command Skeleton Warrior", "Touch of Death",
+"Vulnerability", "Death Skulls", "Soul Sap", "Bloat", "Touch of Death", "Basic<nbsp>Attack", "Soul Sap", "Command Skeleton Warrior", "Basic<nbsp>Attack", "Resonance",  
+ "Living Death", "Touch of Death", "Death Skulls", "Split Soul", "Finger of Death", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Death Skulls",
+ "Finger of Death", "Touch of Death", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Finger of Death", "Finger of Death", "Death Skulls", 
+ "Soul Sap", "Volley of Souls", "Command Skeleton Warrior","Basic<nbsp>Attack","Soul Sap", "Bloat", "Basic<nbsp>Attack", "Touch of Death", "Vulnerability", "Basic<nbsp>Attack","Soul Sap","Bloat", "Command Putrid Zombie",
+ "Basic<nbsp>Attack", "Conjure Undead Army", "Basic<nbsp>Attack", "Soul Sap",  "Freedom","Volley of Souls",
+ "Soul Sap", "Touch of Death", "Basic<nbsp>Attack", "Command Vengeful Ghost", "Soul Sap", "Command Skeleton Warrior", "Command Putrid Zombie", "Basic<nbsp>Attack", "Soul Sap", "Volley of Souls","Death Skulls" ,"Reflect", "Touch of Death", "Finger of Death", "Weapon Special Attack",
+ "Basic<nbsp>Attack", "Bloat",  -- should be dead here 
+
+
+"Command Skeleton Warrior","Soul Sap","Bloat", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Soul Sap", "Bloat", "Volley of Souls", "Basic<nbsp>Attack", "Finger of Death", "Weapon Special Attack", --
+"Command Skeleton Warrior", "Touch of Death", "Finger of Death", "Soul Sap", "Basic<nbsp>Attack", "Bloat", "Basic<nbsp>Attack", "Soul Sap", "Volley of Souls", "Bloat", "Command Skeleton Warrior",
+"Touch of Death","Soul Sap", "Finger of Death", "Basic<nbsp>Attack", "Bloat", "Soul Sap", "Volley of Souls", "Bloat", "Basic<nbsp>Attack",
 }
 
 local deflectCues = {
-    "Suffer",
-    "true",
+    "Suffer at my hand",
+    "This is true power",
 }
 local relevantIds = {
-    overload = {potionID = {}, count = nil }, -- holy overloads
-    summon = { id = 26095, pouchID = {} }, -- hellhound
-    deflectNecro = { id = 30745 },
-    soulSplit = { id = 26033 },
-    sorrow = { id = 30771 },
-    brew = { potionID = {}, count = nil },  -- Shared table for both Saradomin Brew and Guthix Rest
-    blubber = { potionID = {}, count = nil },  
-    adrenaline = { potionID = {}, count = nil }, -- Shared table for both Adrenaline and Renewals
-    excalibur = { hasExcalibur = nil, id = nil },
-}
-
--- Global variables to store the count of each item
-local globalCounts = {
-    overloadCount = nil,
-    brewCount = nil,
-    blubberCount = nil,
-    adrenalineCount = nil,
-    excaliburFound = nil, 
+    overload = {buffId = {26093, 33210, 49039}, potionID = {}, count = 0, globalCount = 0, globalCountSet = false }, 
+    summon = { buffId = {26095}, pouchId = {}, count = 0, globalCount = 0 }, 
+    deflectNecro = { buffId = 30745 },
+    soulSplit = { buffId = 26033 },
+    sorrow = { buffId = 30771 },
+    brew = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false },  -- Shared table for both Saradomin Brew and Guthix Rest
+    blubber = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false },  
+    adrenaline = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false }, -- Shared table for both Adrenaline and Renewals
+    excalibur = { hasExcalibur = false, id = 0 },
+    scroll = { scrollID = {}, amount = 0 },
+    vulnbombs = { id = {}, amount = 0 },
+    restore = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false}
 }
 
 -- Helper function to check if an ID already exists in the list
@@ -66,8 +65,10 @@ end
 -- General function to check for items
 local function checkItem(itemNames, itemTable)
     local itemFound = false
-    itemTable.count = 0  -- Reset count each time the function is called
     local allItems = Inventory:GetItems()
+    if itemTable.count ~= nil then
+        itemTable.count = 0
+    end
 
     -- Check inventory for matching items
     for _, item in ipairs(allItems) do
@@ -80,14 +81,32 @@ local function checkItem(itemNames, itemTable)
                         if not containsId(item.id, itemTable.potionID) then
                             table.insert(itemTable.potionID, item.id)
                         end
-                        itemTable.count = itemTable.count + item.amount
-                    elseif itemTable.hasExcalibur ~= nil then
+                        itemTable.count = itemTable.count + 1
+                    elseif itemTable == relevantIds.excalibur and not itemTable.hasExcalibur then
                         -- **Excalibur Handling**: Only set if not already set
-                        if itemTable.hasExcalibur == nil then
-                            itemTable.hasExcalibur = true
-                            itemTable.id = item.id
-                            print("Found Excalibur with ID: " .. item.id)
+                        itemTable.hasExcalibur = true
+                        itemTable.id = item.id
+                        --print("Found Excalibur with ID: " .. item.id)
+                    elseif itemTable == relevantIds.scroll then
+                        if not containsId(item.id, itemTable.scrollID) then
+                            table.insert(itemTable.scrollID, item.id)
+                            --print("Found Scrolls: " .. item.name)
+                            usingScrolls = true
                         end
+                        itemTable.amount = item.amount
+                    elseif itemTable == relevantIds.summon and itemTable.pouchId then
+                        if not containsId(item.id, itemTable.pouchId) then
+                            table.insert(itemTable.pouchId, item.id)
+                            --print("Found pouch: " .. item.name)
+                        end
+                        itemTable.count = itemTable.count + 1
+                    elseif itemTable == relevantIds.vulnbombs and itemTable.id then
+                        if not containsId(item.id, itemTable.id) then
+                            table.insert(itemTable.id, item.id)
+                            --print("Found vuln bombs" .. relevantIds.vulnbombs.id[1])
+                            usingVulnBombs = true
+                        end
+                        itemTable.amount = item.amount
                     end
                 end
             end
@@ -106,23 +125,31 @@ local function checkItem(itemNames, itemTable)
                 end
             end
             if not idFound then
-                print("Removing ID " .. id .. " from potionID list (not found in inventory).")
+                --print("Removing ID " .. id .. " from potionID list (not found in inventory).")
                 table.remove(itemTable.potionID, i)
             end
         end
     end
-
+    -- Logging the result for the category checked
     if itemFound then
-        if itemTable.hasExcalibur == nil and itemTable.id then
+        if itemTable.hasExcalibur then
             print("Excalibur found and recorded.")
-        elseif not itemTable.globalCount then
+        elseif itemTable.globalCount and not itemTable.globalCountSet then
             itemTable.globalCount = itemTable.count
             print("Set initial count for " .. table.concat(itemNames, " or ") .. ": " .. itemTable.globalCount)
+            itemTable.globalCountSet = true
+        elseif itemTable == relevantIds.scroll and itemTable.amount == 0 and usingScrolls then
+            itemTable.amount = itemTable.amount
+            print("Set initial amount of scrolls for " .. table.concat(itemNames, " or ") .. ": " .. itemTable.amount)
+        elseif itemTable == relevantIds.vulnbombs and itemTable.amount == 0 and usingVulnBombs then
+            itemTable.amount = itemTable.amount
+            print("Set initial amount of scrolls for " .. table.concat(itemNames, " or ") .. ": " .. itemTable.amount)
         else
-            print("Updated count for " .. table.concat(itemNames, " or ") .. ": " .. itemTable.count)
+            print("Updated count for " .. table.concat(itemNames, " or ") .. ": " .. (itemTable.count or itemTable.amount))
         end
     else
         print("No " .. table.concat(itemNames, " or ") .. " found in inventory.")
+        itemTable.globalCount = nil
     end
 end
 
@@ -142,6 +169,14 @@ local function checkInventoryItems(itemCategories)
             checkItem({"adrenaline", "replenishment"}, relevantIds.adrenaline)
         elseif itemCategory == "excalibur" then
             checkItem({"excalibur"}, relevantIds.excalibur)
+        elseif itemCategory == "bindingContract" then
+            checkItem({"binding contract", "pouch"}, relevantIds.summon)
+        elseif itemCategory == "scroll" then
+            checkItem({"scroll"}, relevantIds.scroll)
+        elseif itemCategory == "vulnBombs" then
+            checkItem({"vulnerability bomb"}, relevantIds.vulnbombs)
+        elseif itemCategory == "restore" then
+            checkItem({"super restore", "prayer potion", "prayer flask"}, relevantIds.restore)
         else
             print("Invalid category specified: " .. itemCategory)
         end
@@ -149,21 +184,35 @@ local function checkInventoryItems(itemCategories)
 
     -- Compare current inventory counts to stored global counts
     for category, itemTable in pairs(relevantIds) do
-        if itemTable.globalCount and itemTable.potionID and (itemTable.count or 0) < itemTable.globalCount then
-            print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
+        if itemTable.globalCount and itemTable.potionID and itemTable.count < itemTable.globalCount then
+            --print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
+            return false
+        elseif itemTable.amount and itemTable.amount < 10 and usingScrolls then
+            local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
+            storedScrolls = vbValue - 1048576 + itemTable.amount
+
+            if storedScrolls < 10 then
+                --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
+                return false
+            end
+        elseif itemTable.amount and itemTable.amount < 10 and usingVulnBombs then
+            --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. itemTable.amount .. " remaining.")
             return false
         end
     end
 
     -- **Check for Excalibur: It must be present if it was found initially**
-    if relevantIds.excalibur.hasExcalibur and not Inventory:ContainsID(relevantIds.excalibur.id) then
-        print("Excalibur is missing from inventory!")
+    if relevantIds.excalibur.hasExcalibur and not Inventory:Contains(relevantIds.excalibur.id) then
+        --print("Excalibur is missing from inventory!")
         return false
     end
-
     return true
 end
 
+function getRemainingFamiliarTimeInMinutes()
+    local vb_state = API.VB_FindPSettinOrder(1786, 0).state
+    return math.floor((vb_state * 0.46875) / 60)
+end
 
 local function getRasial()
     local rasial = API.GetAllObjArray1({30165}, 20, {1})
@@ -187,39 +236,51 @@ end
 
 local function buffCheck()
     -- Overload Check
-    if API.Buffbar_GetIDstatus(relevantIds.overload.id, false).id <= 0 and (API.Get_tick() - lastAbilityTime >= 2) and (API.Get_tick() - lastDrinkTime >= globalCD) then --Do not want to interfere in ability use, so make sure 2 ticks after using ability
-        lastDrinkTime = API.Get_tick()
+    local overloadActive = false
+    for _, buffId in ipairs(relevantIds.overload.buffId) do
+        if API.Buffbar_GetIDstatus(buffId, false).id > 0 then
+            overloadActive = true
+            break
+        end
+    end
+    if not overloadActive and (API.Get_tick() - lastAbilityTime >= 2) and (API.Get_tick() - lastDrinkTime >= globalCD) then
         if relevantIds.overload and #relevantIds.overload.potionID > 0 then
             API.DoAction_Inventory1(relevantIds.overload.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route)
-            checkItem({"overload"}, relevantIds.overload, "overload")
+            lastDrinkTime = API.Get_tick()
+            drinkCooldown = true
             return
         end
     end
-
     -- Summon Check
-    --if API.Buffbar_GetIDstatus(relevantIds.summon.id, false).id <= 0 and (API.Get_tick() - lastAbilityTime >=2) and (API.Get_tick() - lastSummonTime >= 1) then 
-       -- lastSummonTime = API.Get_tick()
-      --  API.DoAction_Inventory2({ relevantIds.summon.pouchID }, 0, 1, API.OFF_ACT_GeneralInterface_route)
-
-    --    return
- --  end
+    if API.Buffbar_GetIDstatus(relevantIds.summon.buffId, false).id <= 0 then
+        if getRemainingFamiliarTimeInMinutes() <= 1 then 
+            if relevantIds.summon and #relevantIds.summon.pouchId > 0 then
+                if not genericCooldown then
+                    API.DoAction_Inventory2({ relevantIds.summon.pouchId[1] }, 0, 1, API.OFF_ACT_GeneralInterface_route)
+                    genericCooldown = true
+                    lastGenericTime = API.Get_tick()
+                end
+            end
+        end
+    end
 
     -- Chat Cue Based Prayer Handling
     if inCombat then
         if checkCues() then
-            if API.Buffbar_GetIDstatus(relevantIds.deflectNecro.id, false).id <= 0 then
+            if API.Buffbar_GetIDstatus(relevantIds.deflectNecro.buffId, false).id <= 0 then
                 API.DoAction_Ability("Deflect Necromancy", 1, API.OFF_ACT_GeneralInterface_route)
                 deflectTimer = API.Get_tick() + 6
             end
         elseif API.Get_tick() >= deflectTimer and not genericCooldown then
-            if API.Buffbar_GetIDstatus(relevantIds.soulSplit.id, false).id <= 0 then
+            if API.Buffbar_GetIDstatus(relevantIds.soulSplit.buffId, false).id <= 0 then
                 API.DoAction_Ability("Soul Split", 1, API.OFF_ACT_GeneralInterface_route)
+                --print("Soul split activated")
                 genericCooldown = true
                 lastGenericTime = API.Get_tick()
             end
         end
         -- Sorrow Check
-        if API.Buffbar_GetIDstatus(relevantIds.sorrow.id, false).id <= 0 and not genericCooldown then
+        if API.Buffbar_GetIDstatus(relevantIds.sorrow.buffId, false).id <= 0 and not genericCooldown then
             API.DoAction_Ability("Sorrow", 1, API.OFF_ACT_GeneralInterface_route)
             genericCooldown = true
             lastGenericTime = API.Get_tick()
@@ -227,11 +288,27 @@ local function buffCheck()
     end
 end
 
+local function checkAndStoreScrolls()
+    local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
+    storedScrolls = vbValue - 1048576 -- Extract stored scroll count
+
+    if relevantIds.scroll and #relevantIds.scroll.scrollID > 0 and storedScrolls < 10 and not genericCooldown then
+        API.DoAction_Interface(0xffffffff, 0xffffffff, 1, 662, 78, -1, API.OFF_ACT_GeneralInterface_route)
+        print("Stored more familiar scrolls.")
+        genericCooldown = true
+        lastGenericTime = API.Get_tick()
+    end
+end
+
 local function executeAbility(abilityName)
     if abilityName == "Living Death" then
-        API.DoAction_Ability(abilityName, 1, API.OFF_ACT_GeneralInterface_route, true) 
-        if relevantIds.excalibur.hasExcalibur == true then API.DoAction_Inventory1(relevantIds.excalibur.id,0,1,API.OFF_ACT_GeneralInterface_route) end
-        if #relevantIds.adrenaline.potionID > 0 then API.DoAction_Inventory2(relevantIds.adrenaline.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route) end
+        if drinkCooldown then
+            API.DoAction_Ability("Basic<nbsp>Attack", 1, API.OFF_ACT_GeneralInterface_route, true)
+        else
+            API.DoAction_Ability(abilityName, 1, API.OFF_ACT_GeneralInterface_route, true) 
+            if relevantIds.excalibur.hasExcalibur == true then API.DoAction_Inventory1(relevantIds.excalibur.id,0,1,API.OFF_ACT_GeneralInterface_route) end
+            if #relevantIds.adrenaline.potionID > 0 then API.DoAction_Inventory2(relevantIds.adrenaline.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route) end
+        end
     else
         API.DoAction_Ability(abilityName, 1, API.OFF_ACT_GeneralInterface_route, true)
         --print("Executing ability: " .. abilityName)
@@ -248,14 +325,28 @@ local function timeTrack()
     end
     if currentTime - lastEatTime >= globalCD and foodCooldown then
         foodCooldown = false
-        checkItem({"brew"}, relevantIds.brew, "brew")
-        checkItem({"blubber"}, relevantIds.blubber, "blubber")
+        checkItem({"blubber"}, relevantIds.blubber)
     end
     if currentTime - lastMoveTime >= 2 and moveCooldown then
         moveCooldown = false 
     end
-    if currentTime - lastGenericTime >= globalCD then
+    if currentTime - lastGenericTime >= globalCD and genericCooldown then
         genericCooldown = false
+    end
+    if currentTime - lastDrinkTime >= globalCD and drinkCooldown then
+        drinkCooldown = false
+        checkItem({"brew"}, relevantIds.brew)
+        checkItem({"overload"}, relevantIds.overload)
+        checkItem({"restore"}, relevantIds.restore)
+    end
+    if currentTime - lastScrollTime >= 2 and scrollCooldown then
+        scrollCooldown = false
+        local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
+        storedScrolls = vbValue - 1048576 -- Extract stored scroll count
+    end
+    if currentTime - lastVulnTime >= 100 and vulnCooldown then
+        vulnCooldown = false
+        checkItem({"vulnerability bomb"}, relevantIds.vulnbombs)
     end
 end
 
@@ -326,33 +417,47 @@ end
 
 local function eatNdrink()
     -- Use blubber if found
-    if relevantIds.blubber and #relevantIds.blubber.potionID > 0 then
-        if Inventory:IsOpen() then API.DoAction_Inventory2(relevantIds.blubber.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route) end    
+    if relevantIds.blubber and #relevantIds.blubber.potionID > 0 and not foodCooldown then
+        if Inventory:IsOpen() then API.DoAction_Inventory2(relevantIds.blubber.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route)
+            lastEatTime = API.Get_tick()
+            foodCooldown = true 
+        end    
     end
 
     -- Use brew potion (Saradomin or Guthix) if found
-    if relevantIds.brew and #relevantIds.brew.potionID > 0 then
-        if Inventory:IsOpen() then API.DoAction_Inventory2(relevantIds.brew.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route) end    
+    if relevantIds.brew and #relevantIds.brew.potionID > 0 and not drinkCooldown then
+        if Inventory:IsOpen() then API.DoAction_Inventory2(relevantIds.brew.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route) 
+            lastDrinkTime = API.Get_tick()
+            drinkCooldown = true
+        end    
     end
-
-    -- Set last eaten time and start food cooldown
-    lastEatTime = API.Get_tick()
-    foodCooldown = true
-
-    -- Recheck and update IDs for both brew and blubber
-    checkItem({"saradomin brew", "guthix rest"}, relevantIds.brew, "brew")
-    checkItem({"blubber"}, relevantIds.blubber, "blubber")
 end
 
 local function healthCheck()
     local hp = API.GetHPrecent()
-    if not foodCooldown then
-        if hp < percentHpToEat then
-            eatNdrink()
-        elseif hp < 5 then
-            --print("Teleporting out")
-            WarsRoomTeleport()
-            --print("Something funky happened, resetting")
+    local pray = API.GetPray_()
+    if pray < 100 then
+        if relevantIds.restore and #relevantIds.restore.potionID > 0 and not drinkCooldown then
+            if Inventory:IsOpen() then API.DoAction_Inventory2(relevantIds.restore.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route)
+                lastDrinkTime = API.Get_tick()
+                drinkCooldown = true
+            end
+        end
+    end
+    if hp < percentHpToEat then
+        eatNdrink()
+    elseif hp < 5 then
+        --print("Teleporting out")
+        WarsRoomTeleport()
+        --print("Something funky happened, resetting")
+    end
+    if usingScrolls then
+        local summonHP = Familiars:GetHealth()
+        if tonumber(summonHP) < 6000 and not scrollCooldown then
+            --print(summonHP)
+            API.DoAction_Interface(0xffffffff,0xffffffff,1,1430,36,-1,API.OFF_ACT_GeneralInterface_route)
+            lastScrollTime = API.Get_tick()
+            scrollCooldown = true
         end
     end
 end
@@ -443,13 +548,13 @@ local function isPathSafe(startTile, endTile, badTiles)
 end
 
 local function turnOffPrayers()
-    if API.Buffbar_GetIDstatus(relevantIds.deflectNecro.id, false).id > 0 then
+    if API.Buffbar_GetIDstatus(relevantIds.deflectNecro.buffId, false).id > 0 then
         API.DoAction_Ability("Deflect Necromancy", 1, API.OFF_ACT_GeneralInterface_route)
     end
-    if API.Buffbar_GetIDstatus(relevantIds.soulSplit.id, false).id > 0 then
+    if API.Buffbar_GetIDstatus(relevantIds.soulSplit.buffId, false).id > 0 then
         API.DoAction_Ability("Soul Split", 1, API.OFF_ACT_GeneralInterface_route)
     end
-    if API.Buffbar_GetIDstatus(relevantIds.sorrow.id, false).id > 0 then
+    if API.Buffbar_GetIDstatus(relevantIds.sorrow.buffId, false).id > 0 then
         API.DoAction_Ability("Sorrow", 1, API.OFF_ACT_GeneralInterface_route)
     end
 end
@@ -571,6 +676,12 @@ local function rasialFight()
 
     while API.GetInCombBit() or rasial.Life > 0 do
         rasial = getRasial()
+        if usingVulnBombs and not vulnCooldown then
+            API.DoAction_Inventory2(relevantIds.vulnbombs.id[1],0,1,API.OFF_ACT_GeneralInterface_route)            
+            lastVulnTime = API.Get_tick()
+            vulnCooldown = true
+            --print("Using vuln bomb")
+        end
         if rasial.Life <= 200000 and not inP4 then
           --print("Target's life is at or below 20%. going to p4.")
             inP4 = true
@@ -582,15 +693,14 @@ local function rasialFight()
         timeTrack()
         healthCheck()
         buffCheck()
+        if API.VB_FindPSettinOrder(3102).state == 1 then checkAndStoreScrolls() end
         abilityIndex = abilityTrack(abilityIndex) or abilityIndex
         if inP4 then
             establishSafeBoundary()
             updateBadTiles()
             handleMovement()
         end
-
     end
-    --print("Rotation complete. Target is either gone or below 20% HP.")
 end
 
 local function preRasial() -- walking to the back of the instance
@@ -640,7 +750,7 @@ local function needBank()
     local hp = API.GetHPrecent()
     local pray = API.GetPray_()
     local adren = API.GetAdrenalineFromInterface()
-    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur"}) or hp < 100 or pray < 900 or adren < 100 then
+    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs", "restore"}) or hp < 100 or pray < API.GetPrayMax_() or adren < 100 then
         return true
     end
 end
@@ -649,13 +759,12 @@ local function warsBank()
     local shouldContinue = true
     local hp = API.GetHPrecent()
     API.RandomSleep2(500, 300, 500)
-    
     API.DoAction_Object1(0x33, API.OFF_ACT_GeneralObject_route3, {114750}, 50) -- QUICKLOAD
     API.RandomSleep2(3000, 600, 1200)
     API.WaitUntilMovingEnds(1, 10)
     --if hasBankPin then API.DoBankPin(PIN) end
     
-    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur"}) then
+    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs", "restore"}) then
         shouldContinue = false
         API.Write_LoopyLoop(false)
         return
@@ -667,15 +776,11 @@ local function warsBank()
     end
     
     if shouldContinue then
-        if API.GetPray_() < 900 then
-            API.DoAction_Object1(0x3d, API.OFF_ACT_GeneralObject_route0, {114748}, 50) -- Prayer renewal
-            API.RandomSleep2(2400, 300, 600)
-        end
-        if API.GetAdrenalineFromInterface() < 100 then
-            API.DoAction_Object1(0x29, API.OFF_ACT_GeneralObject_route0, {114749}, 50)
-            while API.GetAdrenalineFromInterface() < 100 do
-                API.RandomSleep2(600, 0, 0)
-            end
+        API.DoAction_Object1(0x3d, API.OFF_ACT_GeneralObject_route0, {114748}, 50) -- Prayer renewal
+        API.RandomSleep2(2400, 300, 600)
+        API.DoAction_Object1(0x29, API.OFF_ACT_GeneralObject_route0, {114749}, 50)
+        while API.GetAdrenalineFromInterface() < 100 do
+            API.RandomSleep2(600, 0, 0)
         end
     end
 end
@@ -712,7 +817,7 @@ end
 local function deathCheck()
     if findNPC(27299, 50) then
         API.RandomSleep2(2500, 1500, 2000)
-       --print("You managed to die... (idiot), do we grab your things and go home?")
+        print("You managed to die... (idiot), do we grab your things and go home?")
         API.RandomSleep2(1000, 800, 600)
         API.DoAction_NPC(0x29, API.OFF_ACT_InteractNPC_route3, {27299}, 50)
         API.RandomSleep2(1500, 1500, 2000)
@@ -724,8 +829,11 @@ local function deathCheck()
     end
 end
 
+local started = false
 local function scriptStart()
-    if not Inventory:IsOpen() then
+    if API.VB_FindPSettinOrder(3039).state == 1 then
+        print("Inventory is open")
+    else
         print("Open the damn inventory, dude. I'm not gonna do everything for you. Whats next? You want me to click the buttons too? Maybe hold your hand while we sort potions? Come on, just pop it open and lets get this over with before I start charging an hourly rate. 5b still gonna ask whats wrong.")
         API.Write_LoopyLoop(false)
         return
@@ -733,11 +841,16 @@ local function scriptStart()
     API.DoAction_Object1(0x33, API.OFF_ACT_GeneralObject_route3, {114750}, 50) -- QUICKLOAD
     API.RandomSleep2(1200, 300, 400)
     API.WaitUntilMovingEnds(1, 10)
-    checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur"})
+    checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "scroll", "bindingContract", "vulnBombs", "restore"})
+    if API.VB_FindPSettinOrder(3102).state == 1 then
+        checkAndStoreScrolls()
+    else
+        print("did not find store scroll button. Make sure familiar interface is open)")
+        API.Write_LoopyLoop(false)
+        return
+    end
     started = true
 end
-
-local started = false
 
 while API.Read_LoopyLoop() do
     API.SetMaxIdleTime(5)
