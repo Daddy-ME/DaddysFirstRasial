@@ -302,9 +302,13 @@ end
 
 local function executeAbility(abilityName)
     if abilityName == "Living Death" then
-        API.DoAction_Ability(abilityName, 1, API.OFF_ACT_GeneralInterface_route, true) 
-        if relevantIds.excalibur.hasExcalibur == true then API.DoAction_Inventory1(relevantIds.excalibur.id,0,1,API.OFF_ACT_GeneralInterface_route) end
-        if #relevantIds.adrenaline.potionID > 0 then API.DoAction_Inventory2(relevantIds.adrenaline.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route) end
+        if drinkCooldown then
+            API.DoAction_Ability("Basic<nbsp>Attack", 1, API.OFF_ACT_GeneralInterface_route, true)
+        else
+            API.DoAction_Ability(abilityName, 1, API.OFF_ACT_GeneralInterface_route, true) 
+            if relevantIds.excalibur.hasExcalibur == true then API.DoAction_Inventory1(relevantIds.excalibur.id,0,1,API.OFF_ACT_GeneralInterface_route) end
+            if #relevantIds.adrenaline.potionID > 0 then API.DoAction_Inventory2(relevantIds.adrenaline.potionID[1], 0, 1, API.OFF_ACT_GeneralInterface_route) end
+        end
     else
         API.DoAction_Ability(abilityName, 1, API.OFF_ACT_GeneralInterface_route, true)
         --print("Executing ability: " .. abilityName)
@@ -828,9 +832,9 @@ end
 local started = false
 local function scriptStart()
     if API.VB_FindPSettinOrder(3039).state == 1 then
-        ("Inventory is open")
+        print("Inventory is open")
     else
-        ("Open the damn inventory, dude. I'm not gonna do everything for you. Whats next? You want me to click the buttons too? Maybe hold your hand while we sort potions? Come on, just pop it open and lets get this over with before I start charging an hourly rate. 5b still gonna ask whats wrong.")
+        print("Open the damn inventory, dude. I'm not gonna do everything for you. Whats next? You want me to click the buttons too? Maybe hold your hand while we sort potions? Come on, just pop it open and lets get this over with before I start charging an hourly rate. 5b still gonna ask whats wrong.")
         API.Write_LoopyLoop(false)
         return
     end
@@ -841,7 +845,7 @@ local function scriptStart()
     if API.VB_FindPSettinOrder(3102).state == 1 then
         checkAndStoreScrolls()
     else
-        ("did not find store scroll button. Make sure familiar interface is open)")
+        print("did not find store scroll button. Make sure familiar interface is open)")
         API.Write_LoopyLoop(false)
         return
     end
