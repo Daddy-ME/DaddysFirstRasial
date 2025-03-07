@@ -86,24 +86,24 @@ local function checkItem(itemNames, itemTable)
                         -- **Excalibur Handling**: Only set if not already set
                         itemTable.hasExcalibur = true
                         itemTable.id = item.id
-                        print("Found Excalibur with ID: " .. item.id)
+                        --print("Found Excalibur with ID: " .. item.id)
                     elseif itemTable == relevantIds.scroll then
                         if not containsId(item.id, itemTable.scrollID) then
                             table.insert(itemTable.scrollID, item.id)
-                            print("Found Scrolls: " .. item.name)
+                            --print("Found Scrolls: " .. item.name)
                             usingScrolls = true
                         end
                         itemTable.amount = item.amount
                     elseif itemTable == relevantIds.summon and itemTable.pouchId then
                         if not containsId(item.id, itemTable.pouchId) then
                             table.insert(itemTable.pouchId, item.id)
-                            print("Found pouch: " .. item.name)
+                            --print("Found pouch: " .. item.name)
                         end
                         itemTable.count = itemTable.count + 1
                     elseif itemTable == relevantIds.vulnbombs and itemTable.id then
                         if not containsId(item.id, itemTable.id) then
                             table.insert(itemTable.id, item.id)
-                            print("Found vuln bombs" .. relevantIds.vulnbombs.id[1])
+                            --print("Found vuln bombs" .. relevantIds.vulnbombs.id[1])
                             usingVulnBombs = true
                         end
                         itemTable.amount = item.amount
@@ -125,7 +125,7 @@ local function checkItem(itemNames, itemTable)
                 end
             end
             if not idFound then
-                print("Removing ID " .. id .. " from potionID list (not found in inventory).")
+                --print("Removing ID " .. id .. " from potionID list (not found in inventory).")
                 table.remove(itemTable.potionID, i)
             end
         end
@@ -185,25 +185,25 @@ local function checkInventoryItems(itemCategories)
     -- Compare current inventory counts to stored global counts
     for category, itemTable in pairs(relevantIds) do
         if itemTable.globalCount and itemTable.potionID and itemTable.count < itemTable.globalCount then
-            print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
+            --print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
             return false
         elseif itemTable.amount and itemTable.amount < 10 and usingScrolls then
             local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
             storedScrolls = vbValue - 1048576 + itemTable.amount
 
             if storedScrolls < 10 then
-                print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
+                --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
                 return false
             end
         elseif itemTable.amount and itemTable.amount < 10 and usingVulnBombs then
-            print("Insufficient " .. category .. " items. Less than 10 found. Only " .. itemTable.amount .. " remaining.")
+            --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. itemTable.amount .. " remaining.")
             return false
         end
     end
 
     -- **Check for Excalibur: It must be present if it was found initially**
     if relevantIds.excalibur.hasExcalibur and not Inventory:Contains(relevantIds.excalibur.id) then
-        print("Excalibur is missing from inventory!")
+        --print("Excalibur is missing from inventory!")
         return false
     end
     return true
@@ -274,7 +274,7 @@ local function buffCheck()
         elseif API.Get_tick() >= deflectTimer and not genericCooldown then
             if API.Buffbar_GetIDstatus(relevantIds.soulSplit.buffId, false).id <= 0 then
                 API.DoAction_Ability("Soul Split", 1, API.OFF_ACT_GeneralInterface_route)
-                print("Soul split activated")
+                --print("Soul split activated")
                 genericCooldown = true
                 lastGenericTime = API.Get_tick()
             end
@@ -342,7 +342,7 @@ local function timeTrack()
     end
     if currentTime - lastVulnTime >= 100 and vulnCooldown then
         vulnCooldown = false
-        checkItem({"vulnBombs"}, relevantIds.vulnbombs)
+        checkItem({"vulnerability bomb"}, relevantIds.vulnbombs)
     end
 end
 
@@ -450,7 +450,7 @@ local function healthCheck()
     if usingScrolls then
         local summonHP = Familiars:GetHealth()
         if tonumber(summonHP) < 6000 and not scrollCooldown then
-            print(summonHP)
+            --print(summonHP)
             API.DoAction_Interface(0xffffffff,0xffffffff,1,1430,36,-1,API.OFF_ACT_GeneralInterface_route)
             lastScrollTime = API.Get_tick()
             scrollCooldown = true
@@ -676,7 +676,7 @@ local function rasialFight()
             API.DoAction_Inventory2(relevantIds.vulnbombs.id[1],0,1,API.OFF_ACT_GeneralInterface_route)            
             lastVulnTime = API.Get_tick()
             vulnCooldown = true
-            print("Using vuln bomb")
+            --print("Using vuln bomb")
         end
         if rasial.Life <= 200000 and not inP4 then
           --print("Target's life is at or below 20%. going to p4.")
@@ -746,7 +746,7 @@ local function needBank()
     local hp = API.GetHPrecent()
     local pray = API.GetPray_()
     local adren = API.GetAdrenalineFromInterface()
-    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs", "restore"}) or hp < 100 or pray < 900 or adren < 100 then
+    if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs", "restore"}) or hp < 100 or pray < API.GetPrayMax_() or adren < 100 then
         return true
     end
 end
@@ -813,7 +813,7 @@ end
 local function deathCheck()
     if findNPC(27299, 50) then
         API.RandomSleep2(2500, 1500, 2000)
-       --print("You managed to die... (idiot), do we grab your things and go home?")
+        print("You managed to die... (idiot), do we grab your things and go home?")
         API.RandomSleep2(1000, 800, 600)
         API.DoAction_NPC(0x29, API.OFF_ACT_InteractNPC_route3, {27299}, 50)
         API.RandomSleep2(1500, 1500, 2000)
@@ -828,9 +828,9 @@ end
 local started = false
 local function scriptStart()
     if API.VB_FindPSettinOrder(3039).state == 1 then
-        print("Inventory is open")
+        ("Inventory is open")
     else
-        print("Open the damn inventory, dude. I'm not gonna do everything for you. Whats next? You want me to click the buttons too? Maybe hold your hand while we sort potions? Come on, just pop it open and lets get this over with before I start charging an hourly rate. 5b still gonna ask whats wrong.")
+        ("Open the damn inventory, dude. I'm not gonna do everything for you. Whats next? You want me to click the buttons too? Maybe hold your hand while we sort potions? Come on, just pop it open and lets get this over with before I start charging an hourly rate. 5b still gonna ask whats wrong.")
         API.Write_LoopyLoop(false)
         return
     end
@@ -841,7 +841,7 @@ local function scriptStart()
     if API.VB_FindPSettinOrder(3102).state == 1 then
         checkAndStoreScrolls()
     else
-        print("did not find store scroll button. Make sure familiar interface is open)")
+        ("did not find store scroll button. Make sure familiar interface is open)")
         API.Write_LoopyLoop(false)
         return
     end
