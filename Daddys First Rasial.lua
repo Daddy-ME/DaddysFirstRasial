@@ -514,8 +514,8 @@ local function healthCheck()
         --print("Something funky happened, resetting")
     end
     if usingScrolls and hasScrollId(49413) then
-        local summonHP = Familiars:GetHealth()
-        if tonumber(summonHP) < 6000 and not scrollCooldown then
+        local summonHP = API.VB_FindPSettinOrder(5194).state & 0xFFFF
+        if summonHP < 2000 and not scrollCooldown then
             --print(summonHP)
             API.DoAction_Interface(0xffffffff,0xffffffff,1,1430,36,-1,API.OFF_ACT_GeneralInterface_route)
             lastScrollTime = API.Get_tick()
