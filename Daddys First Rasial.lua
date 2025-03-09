@@ -232,7 +232,7 @@ local function checkInventoryItems(itemCategories)
         if itemTable.globalCount and itemTable.potionID and itemTable.count < itemTable.globalCount then
             --print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
             return false
-        elseif itemTable.amount and itemTable.amount < 10 and usingScrolls then
+        elseif itemTable == "scroll" and itemTable.amount and itemTable.amount < 10 and usingScrolls then
             local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
             storedScrolls = vbValue - 1048576 + itemTable.amount
 
@@ -240,7 +240,7 @@ local function checkInventoryItems(itemCategories)
                 --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
                 return false
             end
-        elseif itemTable.amount and itemTable.amount < 10 and usingVulnBombs then
+        elseif itemTable == "vulnBombs" and itemTable.amount and itemTable.amount < 10 and usingVulnBombs then
             --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. itemTable.amount .. " remaining.")
             return false
         end
