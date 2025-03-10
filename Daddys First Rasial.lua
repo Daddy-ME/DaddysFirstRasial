@@ -1,10 +1,11 @@
---print("Daddy's first Rasial 1.3")
+--print("Daddy's first Rasial 1.22")
 --print("by Daddy")
 local API = require("api")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
-local percentHpToEat = 30
-local useEquilibriumAura = true
+local percentHpToEat = 50
+local useEquilibriumAura = false
+local useScripture = false
 --local hasBankPin = false
 --local PIN = 0000
 -----------------------------------------------
@@ -772,7 +773,7 @@ local function loot()
     rasialDead = true
     inCombat = false
     turnOffPrayers()
-    if relevantIds.scripture.hasScripture then turnOffScripture() end
+    if useScripture and relevantIds.scripture.hasScripture then turnOffScripture() end
     --print("Starting loot function")
     local loot = API.ReadAllObjectsArray({3}, {-1}, {})
     --print("Found " .. #loot .. " objects to loot")
@@ -949,7 +950,7 @@ end
 local function DungeonEntrance()
     if findNpcOrObject(127142, 5, 12) then
         buffCheck()
-        if relevantIds.scripture.hasScripture then activateScripture() end
+        if useScripture and relevantIds.scripture.hasScripture then activateScripture() end
         --print("Entrance Found, Conjuring and Extending")
         executeAbility("Conjure Undead Army")
         API.RandomSleep2(1800, 600, 0)
@@ -1079,7 +1080,7 @@ local function scriptStart()
     API.RandomSleep2(1200, 300, 400)
     API.WaitUntilMovingEnds(1, 10)
     checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "scroll", "bindingContract", "vulnBombs", "restore"})
-    checkScripture()
+    if useScripture then checkScripture() end
     if API.VB_FindPSettinOrder(3102).state == 1 then
         checkAndStoreScrolls()
     else
