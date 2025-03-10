@@ -1,4 +1,4 @@
---print("Daddy's first Rasial 1.22")
+--print("Daddy's first Rasial 1.23")
 --print("by Daddy")
 local API = require("api")
 local UTILS = require("utils")
@@ -6,7 +6,7 @@ local AURAS = require("deadAuras")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
 local percentHpToEat = 50
-local useEquilibriumAura = false
+local useEquilibriumAura = true
 --local hasBankPin = false
 --local PIN = 0000
 -----------------------------------------------
@@ -14,14 +14,15 @@ local globalCD = 3
 
 local globalCooldownActive, foodCooldown, drinkCooldown, moveCooldown, genericCooldown, vulnCooldown = false, false, false, false, false, false
 local lastAbilityTime, lastEatTime, lastMoveTime, lastDrinkTime, lastSummonTime, lastGenericTime, lastVulnTime, lastScrollTime = 0, 0, 0, 0, 0, 0, 0, 0
-local deflectTimer, storedScrolls = 0, 0
+local deflectTimer, storedScrolls, ticksPassed = 0, 0
 local inP4, inCombat, rasialDead, usingScrolls, usingVulnBombs = false, false, false, false, false
+local isntanceTile = {}
 
 local badTiles = {}
 local safeBoundary = {}
 
 local abilityRotation = { -- Ability rotation order, change as needed!
-"Vulnerability", "Death Skulls", "Soul Sap", "Bloat", "Touch of Death", "Basic<nbsp>Attack", "Soul Sap", "Command Skeleton Warrior", "Basic<nbsp>Attack", "Resonance",  
+ "Death Skulls", "Soul Sap", "Bloat", "Touch of Death", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Soul Sap", "Command Skeleton Warrior", "Basic<nbsp>Attack", "Resonance",  
 }
 
 local deflectCues = {
@@ -36,7 +37,7 @@ local relevantIds = {
     sorrow = { buffId = 30771 },
     brew = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false },  -- Shared table for both Saradomin Brew and Guthix Rest
     blubber = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false },  
-    adrenaline = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false }, -- Shared table for both Adrenaline and Renewals
+    adrenaline = { debuffId = {26094}, potionID = {}, count = 0, globalCount = 0, globalCountSet = false }, -- Shared table for both Adrenaline and Renewals
     excalibur = { hasExcalibur = false, id = 0 },
     scroll = { scrollID = {}, amount = 0 },
     vulnbombs = { id = {}, amount = 0 },
@@ -120,24 +121,24 @@ local function checkItem(itemNames, itemTable)
                         -- **Excalibur Handling**: Only set if not already set
                         itemTable.hasExcalibur = true
                         itemTable.id = item.id
-                        --print("Found Excalibur with ID: " .. item.id)
+                        print("Found Excalibur with ID: " .. item.id)
                     elseif itemTable == relevantIds.scroll then
                         if not containsId(item.id, itemTable.scrollID) then
                             table.insert(itemTable.scrollID, item.id)
-                            --print("Found Scrolls: " .. item.name)
+                            print("Found Scrolls: " .. item.name)
                             usingScrolls = true
                         end
                         itemTable.amount = item.amount
                     elseif itemTable == relevantIds.summon and itemTable.pouchId then
                         if not containsId(item.id, itemTable.pouchId) then
                             table.insert(itemTable.pouchId, item.id)
-                            --print("Found pouch: " .. item.name)
+                            print("Found pouch: " .. item.name)
                         end
                         itemTable.count = itemTable.count + 1
                     elseif itemTable == relevantIds.vulnbombs and itemTable.id then
                         if not containsId(item.id, itemTable.id) then
                             table.insert(itemTable.id, item.id)
-                            --print("Found vuln bombs" .. relevantIds.vulnbombs.id[1])
+                            print("Found vuln bombs" .. relevantIds.vulnbombs.id[1])
                             usingVulnBombs = true
                         end
                         itemTable.amount = item.amount
@@ -219,25 +220,25 @@ local function checkInventoryItems(itemCategories)
     -- Compare current inventory counts to stored global counts
     for category, itemTable in pairs(relevantIds) do
         if itemTable.globalCount and itemTable.potionID and itemTable.count < itemTable.globalCount then
-            --print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
+            print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
             return false
         elseif itemTable == "scroll" and itemTable.amount and itemTable.amount < 10 and usingScrolls then
             local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
             storedScrolls = vbValue - 1048576 + itemTable.amount
 
             if storedScrolls < 10 then
-                --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
+                print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
                 return false
             end
         elseif itemTable == "vulnBombs" and itemTable.amount and itemTable.amount < 10 and usingVulnBombs then
-            --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. itemTable.amount .. " remaining.")
+            print("Insufficient " .. category .. " items. Less than 10 found. Only " .. itemTable.amount .. " remaining.")
             return false
         end
     end
 
     -- **Check for Excalibur: It must be present if it was found initially**
     if relevantIds.excalibur.hasExcalibur and not Inventory:Contains(relevantIds.excalibur.id) then
-        --print("Excalibur is missing from inventory!")
+        print("Excalibur is missing from inventory!")
         return false
     end
     return true
@@ -724,9 +725,24 @@ local function rasialFight()
     local abilityIndex = 1
     inCombat = true
     local rasial = getRasial()
-
+    local correctTile = {
+        x = instanceTile.x,
+        y = instanceTile.y + 22,
+        z = instanceTile.z
+    }
+    
+    
     while API.GetInCombBit() or rasial.Life > 0 do
         rasial = getRasial()
+        local playerPos = API.PlayerCoordfloat()
+        if (math.floor(playerPos.x) ~= math.floor(correctTile.x) or math.floor(playerPos.y) ~= math.floor(correctTile.y) or math.floor(playerPos.z) ~= math.floor(correctTile.z)) and not inP4 and not moveCooldown and not (API.Get_tick() - ticksPassed > 133) then
+            local targetX = math.floor(correctTile.x)
+            local targetY = math.floor(correctTile.y)
+            --print("Moving to tile:", targetX, targetY)
+            API.DoAction_Tile(WPOINT.new(targetX, targetY, 0)) 
+            moveCooldown = true
+            lastMoveTime = API.Get_tick()
+        end
         if usingVulnBombs and not vulnCooldown then
             API.DoAction_Inventory2(relevantIds.vulnbombs.id[1],0,1,API.OFF_ACT_GeneralInterface_route)            
             lastVulnTime = API.Get_tick()
@@ -741,6 +757,7 @@ local function rasialFight()
             loot()
             return
         end
+        
         timeTrack()
         healthCheck()
         buffCheck()
@@ -756,13 +773,15 @@ end
 
 local function preRasial() -- walking to the back of the instance
     if findNpcOrObject(126134, 30, 12) and not hasTarget() then
+        ticksPassed = API.Get_tick()
+        instanceTile = API.PlayerCoordfloat()
       --print("Encounter Started, moving to back")
-        API.RandomSleep2(300, 300, 0)
+        API.RandomSleep2(1200, 0, 0)
         UTILS.surge()
         API.DoAction_Ability("Command Vengeful Ghost", 1, API.OFF_ACT_GeneralInterface_route)
-        API.RandomSleep2(600, 600, 0)
-        moveToOffsetTile(0, 12)
         API.RandomSleep2(1200, 600, 0)
+        moveToOffsetTile(0, 12)
+        API.RandomSleep2(600, 600, 0)
         API.DoAction_Ability("Command Skeleton Warrior", 1, API.OFF_ACT_GeneralInterface_route)
     else
        --print(findNpcOrObject(126134, 50, 12))
@@ -773,7 +792,27 @@ local function DungeonEntrance()
     if findNpcOrObject(127142, 5, 12) then
         buffCheck()
         if useEquilibriumAura then
-            AURAS.EQUILIBRIUM:activate()
+            if not AURAS.isAuraEquipped() then
+                if not captureAuraActivation() then
+                    print("aura on cooldown, resetting")
+                    RandomSleep2(1200,0,0)
+                    AURAS.openAuraInterface()
+                    RandomSleep2(1200,0,0)
+                    API.DoAction_Interface(0xffffffff,0x5716,1,1929,95,23,API.OFF_ACT_GeneralInterface_route)
+                    RandomSleep2(1200,0,0)
+                    API.DoAction_Interface(0xffffffff,0x7c68,1,1929,24,-1,API.OFF_ACT_GeneralInterface_route)
+                    RandomSleep2(1800,0,0)
+                    refreshStatus = API.ScanForInterfaceTest2Get(false, refreshInterface)
+                    auraRefreshes = API.ScanForInterfaceTest2Get(false, auraRefreshInterface2)
+                    if #refreshStatus > 0 and auraRefreshes[1].itemid1_size > 0 then
+                        API.DoAction_Interface(0xffffffff,0xffffffff,0,1188,8,-1,API.OFF_ACT_GeneralInterface_Choose_option)
+                    end
+                    RandomSleep2(1800,0,0)
+                    AURAS.EQUILIBRIUM:activate()
+                    RandomSleep2(1800,0,0)
+                    AURAS.closeAuraInterface()
+                end
+            end
         end
         --print("Entrance Found, Conjuring and Extending")
         executeAbility("Conjure Undead Army")
@@ -788,7 +827,7 @@ local function DungeonEntrance()
             API.RandomSleep2(1200, 300, 600)
             if API.Compare2874Status(18) then
                 API.DoAction_Interface(0x24,0xffffffff,1,1591,60,-1,API.OFF_ACT_GeneralInterface_route)
-                API.RandomSleep2(1200, 300, 600)
+                API.RandomSleep2(900, 300, 0)
                 preRasial()
             end
         else
@@ -821,6 +860,7 @@ local function warsBank()
     if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs", "restore"}) then
         shouldContinue = false
         API.Write_LoopyLoop(false)
+        print("stopping cause we out of some shit yo")
         return
     end
     
@@ -833,7 +873,7 @@ local function warsBank()
         API.DoAction_Object1(0x3d, API.OFF_ACT_GeneralObject_route0, {114748}, 50) -- Prayer renewal
         API.RandomSleep2(2400, 300, 600)
         API.DoAction_Object1(0x29, API.OFF_ACT_GeneralObject_route0, {114749}, 50)
-        while API.GetAdrenalineFromInterface() < 100 do
+        while (API.GetAdrenalineFromInterface() < 100) or (API.Buffbar_GetIDstatus(relevantIds.adrenaline.debuffId, false).id > 0) do
             API.RandomSleep2(600, 0, 0)
         end
     end
