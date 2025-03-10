@@ -1,7 +1,6 @@
---print("Daddy's first Rasial 1.23")
+--print("Daddy's first Rasial 1.22")
 --print("by Daddy")
 local API = require("api")
-local UTILS = require("utils")
 local AURAS = require("deadAuras")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
@@ -436,14 +435,6 @@ local function findNpcOrObject(npcid, distance, objType)
     return #API.GetAllObjArray1({npcid}, distance, {objType}) > 0
 end
 
-function UTILS.surge()
-    local surgeAB = UTILS.getSkillOnBar("Surge")
-    if surgeAB ~= nil then
-        return API.DoAction_Ability_Direct(surgeAB, 1, API.OFF_ACT_GeneralInterface_route)
-    end
-    return false
-end
-
 local function WarsRoomTeleport()
     API.DoAction_Ability("War's Retreat Teleport", 1, API.OFF_ACT_GeneralInterface_route)
     API.RandomSleep2(1200, 1200, 1800)
@@ -777,7 +768,7 @@ local function preRasial() -- walking to the back of the instance
         instanceTile = API.PlayerCoordfloat()
       --print("Encounter Started, moving to back")
         API.RandomSleep2(1200, 0, 0)
-        UTILS.surge()
+        API.DoAction_Ability("Surge", 1, API.OFF_ACT_GeneralInterface_route, true)
         API.DoAction_Ability("Command Vengeful Ghost", 1, API.OFF_ACT_GeneralInterface_route)
         API.RandomSleep2(1200, 600, 0)
         moveToOffsetTile(0, 12)
