@@ -22,17 +22,6 @@ local safeBoundary = {}
 
 local abilityRotation = { -- Ability rotation order, change as needed!
 "Vulnerability", "Death Skulls", "Soul Sap", "Bloat", "Touch of Death", "Basic<nbsp>Attack", "Soul Sap", "Command Skeleton Warrior", "Basic<nbsp>Attack", "Resonance",  
- "Living Death", "Touch of Death", "Death Skulls", "Split Soul", "Finger of Death", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Death Skulls",
- "Finger of Death", "Touch of Death", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Finger of Death", "Finger of Death", "Death Skulls", 
- "Soul Sap", "Volley of Souls", "Command Skeleton Warrior","Basic<nbsp>Attack","Soul Sap", "Bloat", "Basic<nbsp>Attack", "Touch of Death", "Vulnerability", "Basic<nbsp>Attack","Soul Sap","Bloat", "Command Putrid Zombie",
- "Basic<nbsp>Attack", "Conjure Undead Army", "Basic<nbsp>Attack", "Soul Sap",  "Freedom","Volley of Souls",
- "Soul Sap", "Touch of Death", "Basic<nbsp>Attack", "Command Vengeful Ghost", "Soul Sap", "Command Skeleton Warrior", "Command Putrid Zombie", "Basic<nbsp>Attack", "Soul Sap", "Volley of Souls","Death Skulls" ,"Reflect", "Touch of Death", "Finger of Death", "Weapon Special Attack",
- "Basic<nbsp>Attack", "Bloat",  -- should be dead here 
-
-
-"Command Skeleton Warrior","Soul Sap","Bloat", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Soul Sap", "Bloat", "Volley of Souls", "Basic<nbsp>Attack", "Finger of Death", "Weapon Special Attack", --
-"Command Skeleton Warrior", "Touch of Death", "Finger of Death", "Soul Sap", "Basic<nbsp>Attack", "Bloat", "Basic<nbsp>Attack", "Soul Sap", "Volley of Souls", "Bloat", "Command Skeleton Warrior",
-"Touch of Death","Soul Sap", "Finger of Death", "Basic<nbsp>Attack", "Bloat", "Soul Sap", "Volley of Souls", "Bloat", "Basic<nbsp>Attack",
 }
 
 local deflectCues = {
