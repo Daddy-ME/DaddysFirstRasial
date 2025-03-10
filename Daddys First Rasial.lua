@@ -1,7 +1,6 @@
 --print("Daddy's first Rasial 1.3")
 --print("by Daddy")
 local API = require("api")
-local AURAS = require("deadAuras")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
 local percentHpToEat = 30
