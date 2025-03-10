@@ -1,4 +1,4 @@
---print("Daddy's first Rasial 1.22")
+--print("Daddy's first Rasial 1.24")
 --print("by Daddy")
 local API = require("api")
 local AURAS = require("deadAuras")
