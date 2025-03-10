@@ -1,11 +1,11 @@
---print("Daddy's first Rasial 1.24")
+--print("Daddy's first Rasial 1.3")
 --print("by Daddy")
 local API = require("api")
 local AURAS = require("deadAuras")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
-local percentHpToEat = 50
-local useEquilibriumAura = false
+local percentHpToEat = 30
+local useEquilibriumAura = true
 --local hasBankPin = false
 --local PIN = 0000
 -----------------------------------------------
@@ -41,7 +41,8 @@ local relevantIds = {
     scroll = { scrollID = {}, amount = 0 },
     vulnbombs = { id = {}, amount = 0 },
     restore = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false},
-    aura = { buffID = 26098 },
+    aura = { buffID = 26098, id = 22294, interfaceSlot = 23 },
+    scripture = { id = {}, hasScripture = false, scriptureTimeRemaining = 0}
 }
 
 -- Helper function to check if an ID already exists in the list
@@ -66,34 +67,148 @@ local auraRefreshInterface2 = {
     InterfaceComp5.new(1929, 21, -1, 0),
     InterfaceComp5.new(1929, 24, -1, 0),
 }
-function captureAuraActivation()
-    local old_print = print
-    local message = nil
+local CONSTANTS = {
+    BUTTON_ACTIVATE = "Activate",
+    BUTTON_DEACTIVATE = "Deactivate",
+    AURA_MANAGEMENT = "Aura Management",
+    READY = "Ready to use",
+    RECHARGING = "Currently recharging"
+}
 
-    -- Override print function
-    print = function(...)
-        local args = {...}
-        local str = ""
+local auraTitleInterface = {
+    InterfaceComp5.new(1929, 0, -1, 0),
+    InterfaceComp5.new(1929, 2, -1, 0),
+    InterfaceComp5.new(1929, 2, 14, 0),
+}
 
-        -- Convert all arguments to string
-        for i, v in ipairs(args) do
-            str = str .. tostring(v)  -- Convert each argument to string
-        end
+local auraStatusTextInterface = {
+    InterfaceComp5.new(1929, 0, -1, 0),
+    InterfaceComp5.new(1929, 3, -1, 0),
+    InterfaceComp5.new(1929, 4, -1, 0),
+    InterfaceComp5.new(1929, 74, -1, 0),
+}
 
-        -- Check if the message is "dont have aura"
-        if str == "dont have aura" then
-            message = str
-        end
-        
-        old_print(...)  -- Call the original print function
+local buttonTextInterface = {
+    InterfaceComp5.new(1929, 0, -1, 0),
+    InterfaceComp5.new(1929, 3, -1, 0),
+    InterfaceComp5.new(1929, 4, -1, 0),
+    InterfaceComp5.new(1929, 6, -1, 0),
+    InterfaceComp5.new(1929, 11, -1, 0),
+    InterfaceComp5.new(1929, 18, -1, 0),
+    InterfaceComp5.new(1929, 19, -1, 0),
+}
+
+local function doesStringInclude(input, searchValue)
+    return string.find(tostring(input), searchValue) ~= nil
+end
+
+local function getInterfaceText(interface)
+    local inter = API.ScanForInterfaceTest2Get(false, interface)
+    return (#inter > 0) and inter[1].textids or nil
+end
+
+local function getButtonText()
+    return getInterfaceText(buttonTextInterface)
+end
+local function openEquipmentInterface()
+    API.DoAction_Interface(0xc2, 0xffffffff, 1, 1432, 5, 2, API.OFF_ACT_GeneralInterface_route)
+    API.RandomSleep2(1200, 100, 300)
+
+end
+
+local function isEquipmentInterfaceOpen()
+    return API.VB_FindPSettinOrder(3074,1).state == 1
+end
+local function isAuraInterfaceOpen()
+    local status = getInterfaceText(auraTitleInterface)
+    print("Checking if aura interface is open: ", status)
+    return status and doesStringInclude(status, CONSTANTS.AURA_MANAGEMENT)
+end
+
+local function openAuraInterface()
+    if isAuraInterfaceOpen() then return end
+    print("Opening aura interface")
+    API.DoAction_Interface(0xffffffff, 0xffffffff, 1, 1464, 15, 14, API.OFF_ACT_GeneralInterface_route)
+    API.RandomSleep2(1200,600,0)
+end
+
+local function closeAuraInterface()
+    print("Closing aura interface")
+    API.DoAction_Interface(0x24, 0xffffffff, 1, 1929, 167, -1, API.OFF_ACT_GeneralInterface_route)
+    API.RandomSleep2(1200, 100, 300)
+
+end
+
+local function canUseAura()
+    local status = getInterfaceText(auraStatusTextInterface)
+    print("Checking if aura can be used: ", status)
+    return status and doesStringInclude(status, CONSTANTS.READY)
+end
+
+local function selectAura()
+    if not isAuraInterfaceOpen() then openAuraInterface() end
+    print("Selecting aura with ID: ", relevantIds.aura.id)
+    API.DoAction_Interface(0xffffffff, relevantIds.aura.id, 1, 1929, 95, relevantIds.aura.interfaceSlot, API.OFF_ACT_GeneralInterface_route)
+    API.RandomSleep2(1200, 100, 300)
+    local btnText = getButtonText()
+    print("Button text after selecting aura: ", btnText)
+    
+    if doesStringInclude(btnText, CONSTANTS.BUTTON_DEACTIVATE) then
+        print("Aura already active")
+        return true  -- Aura is already active
+    end
+    
+    return false  -- Aura is not active, ready to activate
+end
+local function isAuraEquipped()
+    local equipmentOpen = isEquipmentInterfaceOpen()
+    if not equipmentOpen then
+        openEquipmentInterface()
+        API.RandomSleep2(50, 0, 0)
+    end
+    local equipped = API.GetEquipSlot(11).itemid1 ~= -1
+    return equipped
+end
+local function auraOnCooldown()
+    if not isAuraInterfaceOpen() then 
+        openAuraInterface()
+    end
+    
+    -- Ensure aura is selected before checking if it's on cooldown
+    if not selectAura() then
+        local status = getInterfaceText(auraStatusTextInterface)
+        print("Aura status: ", status)  -- Check what the status text is
+        return status and doesStringInclude(status, CONSTANTS.RECHARGING)
     end
 
-    AURAS.EQUILIBRIUM:activate()
-
-    -- Restore original print function
-    print = old_print
-
-    return message ~= "dont have aura"  -- Returns true if activation was successful
+    return false -- Aura is either active or cannot be activated at the moment
+end
+local function activateAura()
+    local btnText = getButtonText()
+    if doesStringInclude(btnText, CONSTANTS.BUTTON_ACTIVATE) then
+        print("Activating aura")
+        API.DoAction_Interface(0x24, 0xffffffff, 1, 1929, 16, -1, API.OFF_ACT_GeneralInterface_route)
+        API.RandomSleep2(1200, 100, 300)
+        closeAuraInterface()
+    else
+        print("Aura cannot be activated")
+    end
+end
+local function resetAura()
+    print("aura on cooldown, resetting")
+    RandomSleep2(1200,0,0)
+    openAuraInterface()
+    RandomSleep2(1200,0,0)
+    API.DoAction_Interface(0xffffffff,0x5716,1,1929,95,23,API.OFF_ACT_GeneralInterface_route)
+    RandomSleep2(1200,0,0)
+    API.DoAction_Interface(0xffffffff,0x7c68,1,1929,24,-1,API.OFF_ACT_GeneralInterface_route)
+    RandomSleep2(1800,0,0)
+    refreshStatus = API.ScanForInterfaceTest2Get(false, refreshInterface)
+    auraRefreshes = API.ScanForInterfaceTest2Get(false, auraRefreshInterface2)
+    if #refreshStatus > 0 and auraRefreshes[1].itemid1_size > 0 then
+        API.DoAction_Interface(0xffffffff,0xffffffff,0,1188,8,-1,API.OFF_ACT_GeneralInterface_Choose_option)
+    end
+    RandomSleep2(1800,0,0)
 end
 
 -- General function to check for items
@@ -243,6 +358,67 @@ local function checkInventoryItems(itemCategories)
     return true
 end
 
+local function checkScripture()
+    -- Ensure the equipment interface is open
+    if not isEquipmentInterfaceOpen() then 
+        openEquipmentInterface() 
+        print("Opening equipment interface.")
+    end
+    
+    -- Get the item from the equipment slot (pocketItem)
+    local pocketItem = API.GetEquipSlot(12).itemid1
+    print("Pocket item ID: " .. tostring(pocketItem))
+    
+    -- Calculate the remaining time based on the 16-bit state
+    local time = (API.VB_FindPSettinOrder(6145).state & 0xFFFF) * 0.6
+    print("Calculated time remaining: " .. time .. " seconds.")
+    
+    -- Check if there's a pocket item (non-zero value)
+    if pocketItem ~= 0 then
+        if not relevantIds.scripture.hasScripture then
+            -- If we don't have scripture, add the item to the table and set the flag
+            relevantIds.scripture.id = pocketItem
+            relevantIds.scripture.scriptureTimeRemaining = time
+            relevantIds.scripture.hasScripture = true  -- Set the flag to true since scripture is now found
+            print("Scripture added to table. ID: " .. tostring(pocketItem))
+        else
+            -- If scripture has already been found, just update the time for the item
+            local found = false
+                if relevantIds.scripture.id == pocketItem then
+                    -- Update the time for the item
+                    relevantIds.scripture.scriptureTimeRemaining = time
+                    found = true
+                    print("Updated time for scripture ID: " .. tostring(pocketItem) .. " to " .. time .. " seconds.")
+                end
+            if not found then
+                print("Scripture with ID " .. tostring(pocketItem) .. " not found in the list.")
+            end
+        end
+    end
+    
+    -- Check if the scripture is low on time
+    if relevantIds.scripture.scriptureTimeRemaining and relevantIds.scripture.scriptureTimeRemaining < 60 then
+        shouldContinue = false
+        print("Scripture is low on time, not continuing.")
+    else
+        print("Scripture time remaining: " .. relevantIds.scripture.scriptureTimeRemaining .. " seconds.")
+    end
+end
+
+local function turnOffScripture()
+    active = (API.VB_FindPSettinOrder(6145).state >> 16) == 4
+    if active then
+        API.DoAction_Interface(0xffffffff,0xca66,2,1464,15,17,API.OFF_ACT_GeneralInterface_route)
+    end
+end
+
+local function activateScripture()
+    active = (API.VB_FindPSettinOrder(6145).state >> 16) == 0
+    if active then
+        API.DoAction_Interface(0xffffffff,0xca66,2,1464,15,17,API.OFF_ACT_GeneralInterface_route)
+    end
+end
+
 function getRemainingFamiliarTimeInMinutes()
     local vb_state = API.VB_FindPSettinOrder(1786, 0).state
     return math.floor((vb_state * 0.46875) / 60)
@@ -297,7 +473,6 @@ local function buffCheck()
             end
         end
     end
-
     -- Chat Cue Based Prayer Handling
     if inCombat then
         if checkCues() then
@@ -382,14 +557,6 @@ local function timeTrack()
         vulnCooldown = false
         checkItem({"vulnerability bomb"}, relevantIds.vulnbombs)
     end
-end
-
-local function openEquipmentInterface()
-    API.DoAction_Interface(0xc2, 0xffffffff, 1, 1432, 5, 2, API.OFF_ACT_GeneralInterface_route)
-end
-
-local function isEquipmentInterfaceOpen()
-    return API.VB_FindPSettinOrder(3074,1).state == 1
 end
 
 local function findNPC(npcid, distance)
@@ -606,6 +773,7 @@ local function loot()
     rasialDead = true
     inCombat = false
     turnOffPrayers()
+    if relevantIds.scripture.hasScripture then turnOffScripture() end
     --print("Starting loot function")
     local loot = API.ReadAllObjectsArray({3}, {-1}, {})
     --print("Found " .. #loot .. " objects to loot")
@@ -782,29 +950,7 @@ end
 local function DungeonEntrance()
     if findNpcOrObject(127142, 5, 12) then
         buffCheck()
-        if useEquilibriumAura then
-            if not AURAS.isAuraEquipped() then
-                if not captureAuraActivation() then
-                    print("aura on cooldown, resetting")
-                    RandomSleep2(1200,0,0)
-                    AURAS.openAuraInterface()
-                    RandomSleep2(1200,0,0)
-                    API.DoAction_Interface(0xffffffff,0x5716,1,1929,95,23,API.OFF_ACT_GeneralInterface_route)
-                    RandomSleep2(1200,0,0)
-                    API.DoAction_Interface(0xffffffff,0x7c68,1,1929,24,-1,API.OFF_ACT_GeneralInterface_route)
-                    RandomSleep2(1800,0,0)
-                    refreshStatus = API.ScanForInterfaceTest2Get(false, refreshInterface)
-                    auraRefreshes = API.ScanForInterfaceTest2Get(false, auraRefreshInterface2)
-                    if #refreshStatus > 0 and auraRefreshes[1].itemid1_size > 0 then
-                        API.DoAction_Interface(0xffffffff,0xffffffff,0,1188,8,-1,API.OFF_ACT_GeneralInterface_Choose_option)
-                    end
-                    RandomSleep2(1800,0,0)
-                    AURAS.EQUILIBRIUM:activate()
-                    RandomSleep2(1800,0,0)
-                    AURAS.closeAuraInterface()
-                end
-            end
-        end
+        if relevantIds.scripture.hasScripture then activateScripture() end
         --print("Entrance Found, Conjuring and Extending")
         executeAbility("Conjure Undead Army")
         API.RandomSleep2(1800, 600, 0)
@@ -854,41 +1000,26 @@ local function warsBank()
         print("stopping cause we out of some shit yo")
         return
     end
-    
+    checkScripture()
     while hp < 100 do  -- Sleeping to heal off damage
         API.RandomSleep2(600, 200, 400)
         hp = API.GetHPrecent()
     end
-    
+    if useEquilibriumAura and API.Buffbar_GetIDstatus(relevantIds.aura.buffId, false).id <= 0 then
+        if not isAuraEquipped() then
+            if auraOnCooldown() then 
+                resetAura() 
+            end
+            selectAura()  -- Ensure the aura is selected before activation
+            activateAura() -- Activate the aura if not already active
+        end
+    end
     if shouldContinue then
         API.DoAction_Object1(0x3d, API.OFF_ACT_GeneralObject_route0, {114748}, 50) -- Prayer renewal
         API.RandomSleep2(2400, 300, 600)
         API.DoAction_Object1(0x29, API.OFF_ACT_GeneralObject_route0, {114749}, 50)
         while (API.GetAdrenalineFromInterface() < 100) or (API.Buffbar_GetIDstatus(relevantIds.adrenaline.debuffId, false).id > 0) do
             API.RandomSleep2(600, 0, 0)
-        end
-    end
-    if useEquilibriumAura then
-        if not AURAS.isAuraEquipped() then
-            if not captureAuraActivation() then
-                print("aura on cooldown, resetting")
-                RandomSleep2(1200,0,0)
-                AURAS.openAuraInterface()
-                RandomSleep2(1200,0,0)
-                API.DoAction_Interface(0xffffffff,0x5716,1,1929,95,23,API.OFF_ACT_GeneralInterface_route)
-                RandomSleep2(1200,0,0)
-                API.DoAction_Interface(0xffffffff,0x7c68,1,1929,24,-1,API.OFF_ACT_GeneralInterface_route)
-                RandomSleep2(1800,0,0)
-                refreshStatus = API.ScanForInterfaceTest2Get(false, refreshInterface)
-                auraRefreshes = API.ScanForInterfaceTest2Get(false, auraRefreshInterface2)
-                if #refreshStatus > 0 and auraRefreshes[1].itemid1_size > 0 then
-                    API.DoAction_Interface(0xffffffff,0xffffffff,0,1188,8,-1,API.OFF_ACT_GeneralInterface_Choose_option)
-                end
-                RandomSleep2(1800,0,0)
-                AURAS.EQUILIBRIUM:activate()
-                RandomSleep2(1800,0,0)
-                AURAS.closeAuraInterface()
-            end
         end
     end
 end
@@ -949,6 +1080,7 @@ local function scriptStart()
     API.RandomSleep2(1200, 300, 400)
     API.WaitUntilMovingEnds(1, 10)
     checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "scroll", "bindingContract", "vulnBombs", "restore"})
+    checkScripture()
     if API.VB_FindPSettinOrder(3102).state == 1 then
         checkAndStoreScrolls()
     else
