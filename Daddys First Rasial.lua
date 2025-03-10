@@ -6,7 +6,7 @@ local AURAS = require("deadAuras")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
 local percentHpToEat = 50
-local useEquilibriumAura = true
+local useEquilibriumAura = false
 --local hasBankPin = false
 --local PIN = 0000
 -----------------------------------------------
