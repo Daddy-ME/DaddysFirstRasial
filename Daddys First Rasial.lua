@@ -1,10 +1,11 @@
---print("Daddy's first Rasial 1.21")
+--print("Daddy's first Rasial 1.31")
 --print("by Daddy")
 local API = require("api")
-local UTILS = require("utils")
 -----------------------------------------------
 -- Edit these. It will automatically combo eat, but no solid food. Make sure these match the names on the ability bar.
 local percentHpToEat = 50
+local useEquilibriumAura = false
+local useScripture = false
 --local hasBankPin = false
 --local PIN = 0000
 -----------------------------------------------
@@ -12,25 +13,15 @@ local globalCD = 3
 
 local globalCooldownActive, foodCooldown, drinkCooldown, moveCooldown, genericCooldown, vulnCooldown = false, false, false, false, false, false
 local lastAbilityTime, lastEatTime, lastMoveTime, lastDrinkTime, lastSummonTime, lastGenericTime, lastVulnTime, lastScrollTime = 0, 0, 0, 0, 0, 0, 0, 0
-local deflectTimer, storedScrolls = 0, 0
+local deflectTimer, storedScrolls, ticksPassed = 0, 0
 local inP4, inCombat, rasialDead, usingScrolls, usingVulnBombs = false, false, false, false, false
+local isntanceTile = {}
 
 local badTiles = {}
 local safeBoundary = {}
 
 local abilityRotation = { -- Ability rotation order, change as needed!
-"Vulnerability", "Death Skulls", "Soul Sap", "Bloat", "Touch of Death", "Basic<nbsp>Attack", "Soul Sap", "Command Skeleton Warrior", "Basic<nbsp>Attack", "Resonance",  
- "Living Death", "Touch of Death", "Death Skulls", "Split Soul", "Finger of Death", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Death Skulls",
- "Finger of Death", "Touch of Death", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Finger of Death", "Finger of Death", "Death Skulls", 
- "Soul Sap", "Volley of Souls", "Command Skeleton Warrior","Basic<nbsp>Attack","Soul Sap", "Bloat", "Basic<nbsp>Attack", "Touch of Death", "Vulnerability", "Basic<nbsp>Attack","Soul Sap","Bloat", "Command Putrid Zombie",
- "Basic<nbsp>Attack", "Conjure Undead Army", "Basic<nbsp>Attack", "Soul Sap",  "Freedom","Volley of Souls",
- "Soul Sap", "Touch of Death", "Basic<nbsp>Attack", "Command Vengeful Ghost", "Soul Sap", "Command Skeleton Warrior", "Command Putrid Zombie", "Basic<nbsp>Attack", "Soul Sap", "Volley of Souls","Death Skulls" ,"Reflect", "Touch of Death", "Finger of Death", "Weapon Special Attack",
- "Basic<nbsp>Attack", "Bloat",  -- should be dead here 
-
-
-"Command Skeleton Warrior","Soul Sap","Bloat", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Soul Sap", "Bloat", "Volley of Souls", "Basic<nbsp>Attack", "Finger of Death", "Weapon Special Attack", --
-"Command Skeleton Warrior", "Touch of Death", "Finger of Death", "Soul Sap", "Basic<nbsp>Attack", "Bloat", "Basic<nbsp>Attack", "Soul Sap", "Volley of Souls", "Bloat", "Command Skeleton Warrior",
-"Touch of Death","Soul Sap", "Finger of Death", "Basic<nbsp>Attack", "Bloat", "Soul Sap", "Volley of Souls", "Bloat", "Basic<nbsp>Attack",
+ "Death Skulls", "Soul Sap", "Bloat", "Touch of Death", "Basic<nbsp>Attack", "Basic<nbsp>Attack", "Soul Sap", "Command Skeleton Warrior", "Basic<nbsp>Attack", "Resonance",  
 }
 
 local deflectCues = {
@@ -45,11 +36,13 @@ local relevantIds = {
     sorrow = { buffId = 30771 },
     brew = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false },  -- Shared table for both Saradomin Brew and Guthix Rest
     blubber = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false },  
-    adrenaline = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false }, -- Shared table for both Adrenaline and Renewals
+    adrenaline = { debuffId = {26094}, potionID = {}, count = 0, globalCount = 0, globalCountSet = false }, -- Shared table for both Adrenaline and Renewals
     excalibur = { hasExcalibur = false, id = 0 },
     scroll = { scrollID = {}, amount = 0 },
     vulnbombs = { id = {}, amount = 0 },
-    restore = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false}
+    restore = { potionID = {}, count = 0, globalCount = 0, globalCountSet = false},
+    aura = { buffID = 26098, id = 22294, interfaceSlot = 23 },
+    scripture = { id = {}, hasScripture = false, scriptureTimeRemaining = 0}
 }
 
 -- Helper function to check if an ID already exists in the list
@@ -60,6 +53,162 @@ local function containsId(id, idList)
         end
     end
     return false
+end
+local refreshInterface = {
+    InterfaceComp5.new(1477, 25, -1, 0),
+    InterfaceComp5.new(1477, 765, -1, 0),
+    InterfaceComp5.new(1477, 767, -1, 0),
+}
+local auraRefreshInterface2 = {
+    InterfaceComp5.new(1929, 0, -1, 0),
+    InterfaceComp5.new(1929, 3, -1, 0),
+    InterfaceComp5.new(1929, 4, -1, 0),
+    InterfaceComp5.new(1929, 20, -1, 0),
+    InterfaceComp5.new(1929, 21, -1, 0),
+    InterfaceComp5.new(1929, 24, -1, 0),
+}
+local CONSTANTS = {
+    BUTTON_ACTIVATE = "Activate",
+    BUTTON_DEACTIVATE = "Deactivate",
+    AURA_MANAGEMENT = "Aura Management",
+    READY = "Ready to use",
+    RECHARGING = "Currently recharging"
+}
+
+local auraTitleInterface = {
+    InterfaceComp5.new(1929, 0, -1, 0),
+    InterfaceComp5.new(1929, 2, -1, 0),
+    InterfaceComp5.new(1929, 2, 14, 0),
+}
+
+local auraStatusTextInterface = {
+    InterfaceComp5.new(1929, 0, -1, 0),
+    InterfaceComp5.new(1929, 3, -1, 0),
+    InterfaceComp5.new(1929, 4, -1, 0),
+    InterfaceComp5.new(1929, 74, -1, 0),
+}
+
+local buttonTextInterface = {
+    InterfaceComp5.new(1929, 0, -1, 0),
+    InterfaceComp5.new(1929, 3, -1, 0),
+    InterfaceComp5.new(1929, 4, -1, 0),
+    InterfaceComp5.new(1929, 6, -1, 0),
+    InterfaceComp5.new(1929, 11, -1, 0),
+    InterfaceComp5.new(1929, 18, -1, 0),
+    InterfaceComp5.new(1929, 19, -1, 0),
+}
+
+local function doesStringInclude(input, searchValue)
+    return string.find(tostring(input), searchValue) ~= nil
+end
+
+local function getInterfaceText(interface)
+    local inter = API.ScanForInterfaceTest2Get(false, interface)
+    return (#inter > 0) and inter[1].textids or nil
+end
+
+local function getButtonText()
+    return getInterfaceText(buttonTextInterface)
+end
+local function openEquipmentInterface()
+    API.DoAction_Interface(0xc2, 0xffffffff, 1, 1432, 5, 2, API.OFF_ACT_GeneralInterface_route)
+    API.RandomSleep2(1200, 100, 300)
+
+end
+
+local function isEquipmentInterfaceOpen()
+    return API.VB_FindPSettinOrder(3074,1).state == 1
+end
+local function isAuraInterfaceOpen()
+    local status = getInterfaceText(auraTitleInterface)
+    print("Checking if aura interface is open: ", status)
+    return status and doesStringInclude(status, CONSTANTS.AURA_MANAGEMENT)
+end
+
+local function openAuraInterface()
+    if isAuraInterfaceOpen() then return end
+    print("Opening aura interface")
+    API.DoAction_Interface(0xffffffff, 0xffffffff, 1, 1464, 15, 14, API.OFF_ACT_GeneralInterface_route)
+    API.RandomSleep2(1200,600,0)
+end
+
+local function closeAuraInterface()
+    print("Closing aura interface")
+    API.DoAction_Interface(0x24, 0xffffffff, 1, 1929, 167, -1, API.OFF_ACT_GeneralInterface_route)
+    API.RandomSleep2(1200, 100, 300)
+
+end
+
+local function canUseAura()
+    local status = getInterfaceText(auraStatusTextInterface)
+    print("Checking if aura can be used: ", status)
+    return status and doesStringInclude(status, CONSTANTS.READY)
+end
+
+local function selectAura()
+    if not isAuraInterfaceOpen() then openAuraInterface() end
+    print("Selecting aura with ID: ", relevantIds.aura.id)
+    API.DoAction_Interface(0xffffffff, relevantIds.aura.id, 1, 1929, 95, relevantIds.aura.interfaceSlot, API.OFF_ACT_GeneralInterface_route)
+    API.RandomSleep2(1200, 100, 300)
+    local btnText = getButtonText()
+    print("Button text after selecting aura: ", btnText)
+    
+    if doesStringInclude(btnText, CONSTANTS.BUTTON_DEACTIVATE) then
+        print("Aura already active")
+        return true  -- Aura is already active
+    end
+    
+    return false  -- Aura is not active, ready to activate
+end
+local function isAuraEquipped()
+    local equipmentOpen = isEquipmentInterfaceOpen()
+    if not equipmentOpen then
+        openEquipmentInterface()
+        API.RandomSleep2(50, 0, 0)
+    end
+    local equipped = API.GetEquipSlot(11).itemid1 ~= -1
+    return equipped
+end
+local function auraOnCooldown()
+    if not isAuraInterfaceOpen() then 
+        openAuraInterface()
+    end
+    
+    -- Ensure aura is selected before checking if it's on cooldown
+    if not selectAura() then
+        local status = getInterfaceText(auraStatusTextInterface)
+        print("Aura status: ", status)  -- Check what the status text is
+        return status and doesStringInclude(status, CONSTANTS.RECHARGING)
+    end
+
+    return false -- Aura is either active or cannot be activated at the moment
+end
+local function activateAura()
+    local btnText = getButtonText()
+    if doesStringInclude(btnText, CONSTANTS.BUTTON_ACTIVATE) then
+        print("Activating aura")
+        API.DoAction_Interface(0x24, 0xffffffff, 1, 1929, 16, -1, API.OFF_ACT_GeneralInterface_route)
+        API.RandomSleep2(1200, 100, 300)
+        closeAuraInterface()
+    else
+        print("Aura cannot be activated")
+    end
+end
+local function resetAura()
+    print("aura on cooldown, resetting")
+    RandomSleep2(1200,0,0)
+    openAuraInterface()
+    RandomSleep2(1200,0,0)
+    API.DoAction_Interface(0xffffffff,0x5716,1,1929,95,23,API.OFF_ACT_GeneralInterface_route)
+    RandomSleep2(1200,0,0)
+    API.DoAction_Interface(0xffffffff,0x7c68,1,1929,24,-1,API.OFF_ACT_GeneralInterface_route)
+    RandomSleep2(1800,0,0)
+    refreshStatus = API.ScanForInterfaceTest2Get(false, refreshInterface)
+    auraRefreshes = API.ScanForInterfaceTest2Get(false, auraRefreshInterface2)
+    if #refreshStatus > 0 and auraRefreshes[1].itemid1_size > 0 then
+        API.DoAction_Interface(0xffffffff,0xffffffff,0,1188,8,-1,API.OFF_ACT_GeneralInterface_Choose_option)
+    end
+    RandomSleep2(1800,0,0)
 end
 
 -- General function to check for items
@@ -86,24 +235,24 @@ local function checkItem(itemNames, itemTable)
                         -- **Excalibur Handling**: Only set if not already set
                         itemTable.hasExcalibur = true
                         itemTable.id = item.id
-                        --print("Found Excalibur with ID: " .. item.id)
+                        print("Found Excalibur with ID: " .. item.id)
                     elseif itemTable == relevantIds.scroll then
                         if not containsId(item.id, itemTable.scrollID) then
                             table.insert(itemTable.scrollID, item.id)
-                            --print("Found Scrolls: " .. item.name)
+                            print("Found Scrolls: " .. item.name)
                             usingScrolls = true
                         end
                         itemTable.amount = item.amount
                     elseif itemTable == relevantIds.summon and itemTable.pouchId then
                         if not containsId(item.id, itemTable.pouchId) then
                             table.insert(itemTable.pouchId, item.id)
-                            --print("Found pouch: " .. item.name)
+                            print("Found pouch: " .. item.name)
                         end
                         itemTable.count = itemTable.count + 1
                     elseif itemTable == relevantIds.vulnbombs and itemTable.id then
                         if not containsId(item.id, itemTable.id) then
                             table.insert(itemTable.id, item.id)
-                            --print("Found vuln bombs" .. relevantIds.vulnbombs.id[1])
+                            print("Found vuln bombs" .. relevantIds.vulnbombs.id[1])
                             usingVulnBombs = true
                         end
                         itemTable.amount = item.amount
@@ -185,28 +334,89 @@ local function checkInventoryItems(itemCategories)
     -- Compare current inventory counts to stored global counts
     for category, itemTable in pairs(relevantIds) do
         if itemTable.globalCount and itemTable.potionID and itemTable.count < itemTable.globalCount then
-            --print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
+            print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
             return false
-        elseif itemTable.amount and itemTable.amount < 10 and usingScrolls then
+        elseif itemTable == "scroll" and itemTable.amount and itemTable.amount < 10 and usingScrolls then
             local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
             storedScrolls = vbValue - 1048576 + itemTable.amount
 
             if storedScrolls < 10 then
-                --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
+                print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
                 return false
             end
-        elseif itemTable.amount and itemTable.amount < 10 and usingVulnBombs then
-            --print("Insufficient " .. category .. " items. Less than 10 found. Only " .. itemTable.amount .. " remaining.")
+        elseif itemTable == "vulnBombs" and itemTable.amount and itemTable.amount < 10 and usingVulnBombs then
+            print("Insufficient " .. category .. " items. Less than 10 found. Only " .. itemTable.amount .. " remaining.")
             return false
         end
     end
 
     -- **Check for Excalibur: It must be present if it was found initially**
     if relevantIds.excalibur.hasExcalibur and not Inventory:Contains(relevantIds.excalibur.id) then
-        --print("Excalibur is missing from inventory!")
+        print("Excalibur is missing from inventory!")
         return false
     end
     return true
+end
+
+local function checkScripture()
+    -- Ensure the equipment interface is open
+    if not isEquipmentInterfaceOpen() then 
+        openEquipmentInterface() 
+        print("Opening equipment interface.")
+    end
+    
+    -- Get the item from the equipment slot (pocketItem)
+    local pocketItem = API.GetEquipSlot(12).itemid1
+    print("Pocket item ID: " .. tostring(pocketItem))
+    
+    -- Calculate the remaining time based on the 16-bit state
+    local time = (API.VB_FindPSettinOrder(6145).state & 0xFFFF) * 0.6
+    print("Calculated time remaining: " .. time .. " seconds.")
+    
+    -- Check if there's a pocket item (non-zero value)
+    if pocketItem ~= 0 then
+        if not relevantIds.scripture.hasScripture then
+            -- If we don't have scripture, add the item to the table and set the flag
+            relevantIds.scripture.id = pocketItem
+            relevantIds.scripture.scriptureTimeRemaining = time
+            relevantIds.scripture.hasScripture = true  -- Set the flag to true since scripture is now found
+            print("Scripture added to table. ID: " .. tostring(pocketItem))
+        else
+            -- If scripture has already been found, just update the time for the item
+            local found = false
+                if relevantIds.scripture.id == pocketItem then
+                    -- Update the time for the item
+                    relevantIds.scripture.scriptureTimeRemaining = time
+                    found = true
+                    print("Updated time for scripture ID: " .. tostring(pocketItem) .. " to " .. time .. " seconds.")
+                end
+            if not found then
+                print("Scripture with ID " .. tostring(pocketItem) .. " not found in the list.")
+            end
+        end
+    end
+    
+    -- Check if the scripture is low on time
+    if relevantIds.scripture.scriptureTimeRemaining and relevantIds.scripture.scriptureTimeRemaining < 60 then
+        shouldContinue = false
+        print("Scripture is low on time, not continuing.")
+    else
+        print("Scripture time remaining: " .. relevantIds.scripture.scriptureTimeRemaining .. " seconds.")
+    end
+end
+
+local function turnOffScripture()
+    active = (API.VB_FindPSettinOrder(6145).state >> 16) == 4
+    if active then
+        API.DoAction_Interface(0xffffffff,0xca66,2,1464,15,17,API.OFF_ACT_GeneralInterface_route)
+    end
+end
+
+local function activateScripture()
+    active = (API.VB_FindPSettinOrder(6145).state >> 16) == 0
+    if active then
+        API.DoAction_Interface(0xffffffff,0xca66,2,1464,15,17,API.OFF_ACT_GeneralInterface_route)
+    end
 end
 
 function getRemainingFamiliarTimeInMinutes()
@@ -263,7 +473,6 @@ local function buffCheck()
             end
         end
     end
-
     -- Chat Cue Based Prayer Handling
     if inCombat then
         if checkCues() then
@@ -367,7 +576,7 @@ end
 
 local function waitForRasial(maxWaitTime)
     local timeWaited = 0
-    local intervalCheck = 200
+    local intervalCheck = 300
 
     while timeWaited < maxWaitTime do
 
@@ -391,14 +600,6 @@ local function findNpcOrObject(npcid, distance, objType)
     local distance = distance or 20
 
     return #API.GetAllObjArray1({npcid}, distance, {objType}) > 0
-end
-
-function UTILS.surge()
-    local surgeAB = UTILS.getSkillOnBar("Surge")
-    if surgeAB ~= nil then
-        return API.DoAction_Ability_Direct(surgeAB, 1, API.OFF_ACT_GeneralInterface_route)
-    end
-    return false
 end
 
 local function WarsRoomTeleport()
@@ -433,6 +634,15 @@ local function eatNdrink()
     end
 end
 
+local function hasScrollId(targetId)
+    for _, id in ipairs(relevantIds.scroll.scrollID) do
+        if id == targetId then
+            return true
+        end
+    end
+    return false
+end
+
 local function healthCheck()
     local hp = API.GetHPrecent()
     local pray = API.GetPray_()
@@ -451,9 +661,9 @@ local function healthCheck()
         WarsRoomTeleport()
         --print("Something funky happened, resetting")
     end
-    if usingScrolls then
-        local summonHP = Familiars:GetHealth()
-        if tonumber(summonHP) < 6000 and not scrollCooldown then
+    if usingScrolls and hasScrollId(49413) then
+        local summonHP = API.VB_FindPSettinOrder(5194).state & 0xFFFF
+        if summonHP < 2000 and not scrollCooldown then
             --print(summonHP)
             API.DoAction_Interface(0xffffffff,0xffffffff,1,1430,36,-1,API.OFF_ACT_GeneralInterface_route)
             lastScrollTime = API.Get_tick()
@@ -563,6 +773,7 @@ local function loot()
     rasialDead = true
     inCombat = false
     turnOffPrayers()
+    if useScripture and relevantIds.scripture.hasScripture then turnOffScripture() end
     --print("Starting loot function")
     local loot = API.ReadAllObjectsArray({3}, {-1}, {})
     --print("Found " .. #loot .. " objects to loot")
@@ -673,9 +884,24 @@ local function rasialFight()
     local abilityIndex = 1
     inCombat = true
     local rasial = getRasial()
-
+    local correctTile = {
+        x = instanceTile.x,
+        y = instanceTile.y + 22,
+        z = instanceTile.z
+    }
+    
+    
     while API.GetInCombBit() or rasial.Life > 0 do
         rasial = getRasial()
+        local playerPos = API.PlayerCoordfloat()
+        if (math.floor(playerPos.x) ~= math.floor(correctTile.x) or math.floor(playerPos.y) ~= math.floor(correctTile.y) or math.floor(playerPos.z) ~= math.floor(correctTile.z)) and not inP4 and not moveCooldown and not (API.Get_tick() - ticksPassed > 133) then
+            local targetX = math.floor(correctTile.x)
+            local targetY = math.floor(correctTile.y)
+            --print("Moving to tile:", targetX, targetY)
+            API.DoAction_Tile(WPOINT.new(targetX, targetY, 0)) 
+            moveCooldown = true
+            lastMoveTime = API.Get_tick()
+        end
         if usingVulnBombs and not vulnCooldown then
             API.DoAction_Inventory2(relevantIds.vulnbombs.id[1],0,1,API.OFF_ACT_GeneralInterface_route)            
             lastVulnTime = API.Get_tick()
@@ -690,6 +916,7 @@ local function rasialFight()
             loot()
             return
         end
+        
         timeTrack()
         healthCheck()
         buffCheck()
@@ -705,13 +932,15 @@ end
 
 local function preRasial() -- walking to the back of the instance
     if findNpcOrObject(126134, 30, 12) and not hasTarget() then
+        ticksPassed = API.Get_tick()
+        instanceTile = API.PlayerCoordfloat()
       --print("Encounter Started, moving to back")
-        API.RandomSleep2(600, 100, 0)
-        UTILS.surge()
+        API.RandomSleep2(1200, 0, 0)
+        API.DoAction_Ability("Surge", 1, API.OFF_ACT_GeneralInterface_route, true)
         API.DoAction_Ability("Command Vengeful Ghost", 1, API.OFF_ACT_GeneralInterface_route)
-        API.RandomSleep2(1200, 100, 0)
-        moveToOffsetTile(0, 12)
         API.RandomSleep2(1200, 600, 0)
+        moveToOffsetTile(0, 12)
+        API.RandomSleep2(600, 600, 0)
         API.DoAction_Ability("Command Skeleton Warrior", 1, API.OFF_ACT_GeneralInterface_route)
     else
        --print(findNpcOrObject(126134, 50, 12))
@@ -721,6 +950,7 @@ end
 local function DungeonEntrance()
     if findNpcOrObject(127142, 5, 12) then
         buffCheck()
+        if useScripture and relevantIds.scripture.hasScripture then activateScripture() end
         --print("Entrance Found, Conjuring and Extending")
         executeAbility("Conjure Undead Army")
         API.RandomSleep2(1800, 600, 0)
@@ -734,7 +964,7 @@ local function DungeonEntrance()
             API.RandomSleep2(1200, 300, 600)
             if API.Compare2874Status(18) then
                 API.DoAction_Interface(0x24,0xffffffff,1,1591,60,-1,API.OFF_ACT_GeneralInterface_route)
-                API.RandomSleep2(1200, 300, 600)
+                API.RandomSleep2(900, 300, 0)
                 preRasial()
             end
         else
@@ -767,24 +997,32 @@ local function warsBank()
     if not checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "bindingContract", "scroll", "vulnBombs", "restore"}) then
         shouldContinue = false
         API.Write_LoopyLoop(false)
+        print("stopping cause we out of some shit yo")
         return
     end
-    
+    checkScripture()
     while hp < 100 do  -- Sleeping to heal off damage
         API.RandomSleep2(600, 200, 400)
         hp = API.GetHPrecent()
     end
-    
+    if useEquilibriumAura and API.Buffbar_GetIDstatus(relevantIds.aura.buffId, false).id <= 0 then
+        if not isAuraEquipped() then
+            if auraOnCooldown() then 
+                resetAura() 
+            end
+            selectAura()  -- Ensure the aura is selected before activation
+            activateAura() -- Activate the aura if not already active
+        end
+    end
     if shouldContinue then
         API.DoAction_Object1(0x3d, API.OFF_ACT_GeneralObject_route0, {114748}, 50) -- Prayer renewal
         API.RandomSleep2(2400, 300, 600)
         API.DoAction_Object1(0x29, API.OFF_ACT_GeneralObject_route0, {114749}, 50)
-        while API.GetAdrenalineFromInterface() < 100 do
+        while (API.GetAdrenalineFromInterface() < 100) or (API.Buffbar_GetIDstatus(relevantIds.adrenaline.debuffId, false).id > 0) do
             API.RandomSleep2(600, 0, 0)
         end
     end
 end
-
 local function WhereTfAreWe()
     local findSconce = findNpcOrObject(126134, 50, 12)
     local findWarAltar = findNpcOrObject(114748, 50, 0)
@@ -842,6 +1080,7 @@ local function scriptStart()
     API.RandomSleep2(1200, 300, 400)
     API.WaitUntilMovingEnds(1, 10)
     checkInventoryItems({"overload", "brew", "blubber", "adrenaline", "excalibur", "scroll", "bindingContract", "vulnBombs", "restore"})
+    if useScripture then checkScripture() end
     if API.VB_FindPSettinOrder(3102).state == 1 then
         checkAndStoreScrolls()
     else
