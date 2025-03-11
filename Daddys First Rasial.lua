@@ -934,10 +934,20 @@ local function preRasial() -- walking to the back of the instance
     if findNpcOrObject(126134, 30, 12) and not hasTarget() then
         ticksPassed = API.Get_tick()
         instanceTile = API.PlayerCoordfloat()
+        instanceTile2 = API.PlayerCoord()
+
+        local diveTile = 
+        {
+            x = instanceTile2.x,
+            y = instanceTile2.y + 22,
+            z = instanceTile2.z,
+        }
       --print("Encounter Started, moving to back")
-        API.RandomSleep2(1200, 600, 0)
+        API.RandomSleep2(600, 600, 0)
         API.DoAction_Ability("Surge", 1, API.OFF_ACT_GeneralInterface_route, true)
+        API.RandomSleep2(300, 300, 0)
         API.DoAction_Ability("Command Vengeful Ghost", 1, API.OFF_ACT_GeneralInterface_route)
+        API.DoAction_Dive_Tile(WPOINT.new(diveTile.x, diveTile.y, diveTile.z))
         API.RandomSleep2(600, 600, 0)
         moveToOffsetTile(0, 12)
         API.RandomSleep2(600, 600, 0)
