@@ -935,10 +935,10 @@ local function preRasial() -- walking to the back of the instance
         ticksPassed = API.Get_tick()
         instanceTile = API.PlayerCoordfloat()
       --print("Encounter Started, moving to back")
-        API.RandomSleep2(1200, 0, 0)
+        API.RandomSleep2(1200, 600, 0)
         API.DoAction_Ability("Surge", 1, API.OFF_ACT_GeneralInterface_route, true)
         API.DoAction_Ability("Command Vengeful Ghost", 1, API.OFF_ACT_GeneralInterface_route)
-        API.RandomSleep2(1200, 600, 0)
+        API.RandomSleep2(600, 600, 0)
         moveToOffsetTile(0, 12)
         API.RandomSleep2(600, 600, 0)
         API.DoAction_Ability("Command Skeleton Warrior", 1, API.OFF_ACT_GeneralInterface_route)
@@ -964,7 +964,7 @@ local function DungeonEntrance()
             API.RandomSleep2(1200, 300, 600)
             if API.Compare2874Status(18) then
                 API.DoAction_Interface(0x24,0xffffffff,1,1591,60,-1,API.OFF_ACT_GeneralInterface_route)
-                API.RandomSleep2(900, 300, 0)
+                API.RandomSleep2(1200, 600, 0)
                 preRasial()
             end
         else
