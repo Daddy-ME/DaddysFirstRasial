@@ -1,4 +1,4 @@
---print("Daddy's first Rasial 1.312")
+--print("Daddy's first Rasial 1.32")
 --print("by Daddy")
 local API = require("api")
 -----------------------------------------------
@@ -337,8 +337,8 @@ local function checkInventoryItems(itemCategories)
             print("Insufficient " .. category .. " items. Expected " .. itemTable.globalCount .. ", found " .. (itemTable.count or 0))
             return false
         elseif itemTable == "scroll" and itemTable.amount and itemTable.amount < 10 and usingScrolls then
-            local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
-            storedScrolls = vbValue - 1048576 + itemTable.amount
+            local vbValue = API.VB_FindPSettinOrder(4823).state & 0xFFFF -- Get the VB value for stored scrolls
+            local storedScrolls = vbValue + itemTable.amount
 
             if storedScrolls < 10 then
                 print("Insufficient " .. category .. " items. Less than 10 found. Only " .. storedScrolls .. " remaining.")
@@ -498,10 +498,10 @@ local function buffCheck()
 end
 
 local function checkAndStoreScrolls()
-    local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
-    storedScrolls = vbValue - 1048576 -- Extract stored scroll count
+    local vbValue = API.VB_FindPSettinOrder(4823).state & 0xFFFF -- Get the VB value for stored scrolls
+    storedScrolls = vbValue -- Extract stored scroll count
 
-    if relevantIds.scroll and #relevantIds.scroll.scrollID > 0 and storedScrolls < 10 and not genericCooldown then
+    if relevantIds.scroll and #relevantIds.scroll.scrollID > 0 and relevantIds.scroll.amount > 0 and storedScrolls < 10 and not genericCooldown then
         API.DoAction_Interface(0xffffffff, 0xffffffff, 1, 662, 78, -1, API.OFF_ACT_GeneralInterface_route)
         print("Stored more familiar scrolls.")
         genericCooldown = true
@@ -550,8 +550,8 @@ local function timeTrack()
     end
     if currentTime - lastScrollTime >= 2 and scrollCooldown then
         scrollCooldown = false
-        local vbValue = API.VB_FindPSettinOrder(4823).state -- Get the VB value for stored scrolls
-        storedScrolls = vbValue - 1048576 -- Extract stored scroll count
+        local vbValue = API.VB_FindPSettinOrder(4823).state & 0xFFFF -- Get the VB value for stored scrolls
+        storedScrolls = vbValue -- Extract stored scroll count
     end
     if currentTime - lastVulnTime >= 100 and vulnCooldown then
         vulnCooldown = false
@@ -920,8 +920,8 @@ local function rasialFight()
         timeTrack()
         healthCheck()
         buffCheck()
-        if API.VB_FindPSettinOrder(3102).state == 1 then checkAndStoreScrolls() end
         abilityIndex = abilityTrack(abilityIndex) or abilityIndex
+        if API.VB_FindPSettinOrder(3102).state == 1 then checkAndStoreScrolls() end
         if inP4 then
             establishSafeBoundary()
             updateBadTiles()
