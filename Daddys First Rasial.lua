@@ -319,7 +319,7 @@ local function checkInventoryItems(itemCategories)
         elseif itemCategory == "excalibur" then
             checkItem({"excalibur"}, relevantIds.excalibur)
         elseif itemCategory == "bindingContract" then
-            checkItem({"binding contract", "pouch"}, relevantIds.summon)
+            checkItem({"binding contract"}, relevantIds.summon)
         elseif itemCategory == "scroll" then
             checkItem({"scroll"}, relevantIds.scroll)
         elseif itemCategory == "vulnBombs" then
